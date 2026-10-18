@@ -1,0 +1,22 @@
+{
+  "name": "@battle/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs"
+  },
+  "dependencies": {
+    "@battle/ai": "workspace:*",
+    "@battle/shared": "workspace:*",
+    "@battle/sim": "workspace:*",
+    "pinia": "^2.3.1",
+    "pixi.js": "^8.8.1",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "esbuild-wasm": "^0.25.12",
+    "typescript": "~5.9.3",
+    "vue-tsc": "^2.2.8"
+  }
+}

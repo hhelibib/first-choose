@@ -1,0 +1,18 @@
+{
+  "name": "battle-ba",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @battle/client dev",
+    "typecheck": "tsc -b",
+    "test": "tsc -b && tsc -p packages/sim/tsconfig.test.json && tsc -p packages/ai/tsconfig.test.json && node --test packages/sim/dist-test/tests/engine/phase.test.js packages/sim/dist-test/tests/systems/movement.test.js packages/sim/dist-test/tests/world/occupancy.test.js packages/sim/dist-test/tests/replay/hash.test.js packages/sim/dist-test/tests/systems/combat.test.js packages/sim/dist-test/tests/systems/gather.test.js packages/sim/dist-test/tests/systems/build.test.js packages/sim/dist-test/tests/systems/repair.test.js packages/sim/dist-test/tests/systems/production.test.js packages/sim/dist-test/tests/systems/cards.test.js packages/sim/dist-test/tests/systems/victory.test.js packages/sim/dist-test/tests/replay/replay.test.js packages/ai/dist-test/tests/rule-ai.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.8",
+    "typescript": "~5.9.3"
+  }
+}

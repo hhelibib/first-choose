@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "types": [],
+    "paths": {
+      "@battle/shared": ["../shared/src/index.ts"],
+      "@battle/sim": ["../sim/src/index.ts"],
+      "@battle/ai": ["../ai/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

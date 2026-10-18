@@ -1,0 +1,25 @@
+---
+description: 模拟核心保持纯 TypeScript，并且 tick 结果可回放
+alwaysApply: true
+---
+
+# 模拟核心
+
+- 权威模拟只放在 `packages/sim`。禁止依赖 DOM、Node API、Vue、Pinia、PixiJS。
+- `packages/ai` 只能调用 `submitCommand`、`clearCommand`、`playCard`，禁止直接改 `GameState`。
+
+```typescript
+// 禁止：可变帧长、墙钟、浮点插值、随机标识进入权威状态
+tick(deltaMs: number)
+state.phaseEndsAtMs = Date.now()
+id = crypto.randomUUID()
+
+// 采用：一次调用推进一个 50ms tick，标识来自状态计数器
+tick(): TickResult
+state.phaseTicksRemaining -= 1
+id = `u${state.unitSeq++}`
+```
+
+- 禁止 `Math.random()`。牌序按固定列表和实例 ID 排序。
+- 单位、建筑、伤害结算按 ID 升序。寻路邻居顺序为北、东、南、西。
+- 哈希不包含墙钟和渲染坐标。回放重放命令日志，不重新运行 AI。
