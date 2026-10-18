@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { ResourceType, Resources } from '@battle/shared'
 import { BUILDING_TYPE_IDS, useMatchStore } from '../store/match'
-import { canAfford, formatDuration, formatResources } from '../format/resources'
+import { canAfford, formatDuration, formatResources, resourceLabel } from '../format/resources'
 import EntityCard from './EntityCard.vue'
 
 const store = useMatchStore()
@@ -11,8 +12,11 @@ const commands = computed(() => store.config?.units[store.selectedUnit?.typeId ?
 const recipes = computed(() => store.config?.buildings[store.selectedBuilding?.typeId ?? '']?.production ?? [])
 const canAct = computed(() => store.isOperation && !!store.selected)
 
+const farm = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.farm] ?? null)
 const lumberCamp = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.lumberCamp] ?? null)
+const quarry = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.quarry] ?? null)
 const oreCamp = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.oreCamp] ?? null)
+const goldCamp = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.goldCamp] ?? null)
 const barracks = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.barracks] ?? null)
 const arrowTower = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.arrowTower] ?? null)
 const placing = computed(() => (store.mode === 'build' && store.buildTypeId ? store.config?.buildings[store.buildTypeId] : null))
@@ -22,7 +26,11 @@ function unitName(typeId: string): string {
   return store.config?.units[typeId]?.name ?? typeId
 }
 
-function recipeHint(typeId: string, cost: { wood: number; ore: number; gold: number }, timeMs: number): string {
+function harvestName(type: ResourceType): string {
+  return resourceLabel(type)
+}
+
+function recipeHint(typeId: string, cost: Resources, timeMs: number): string {
   const pop = store.config?.units[typeId]?.population ?? 0
   const parts = [formatResources(cost), formatDuration(timeMs)]
   if (pop > 0) {
@@ -31,11 +39,11 @@ function recipeHint(typeId: string, cost: { wood: number; ore: number; gold: num
   return parts.join(' · ')
 }
 
-function buildHint(cost: { wood: number; ore: number; gold: number }, timeMs: number): string {
+function buildHint(cost: Resources, timeMs: number): string {
   return `${formatResources(cost)} · ${formatDuration(timeMs)}`
 }
 
-function shortOn(cost: { wood: number; ore: number; gold: number }): boolean {
+function shortOn(cost: Resources): boolean {
   return !canAfford(store.player?.resources, cost)
 }
 </script>
@@ -44,22 +52,34 @@ function shortOn(cost: { wood: number; ore: number; gold: number }): boolean {
   <aside class="command-panel" :class="{ open }">
     <div v-show="open" class="body">
     <h2>资料</h2>
-    <p v-if="!store.selected" class="hint">单击己方单位或建筑。右键地面移动，右键敌人攻击。资源靠伐木场和采矿场自动产出。</p>
+    <p v-if="!store.selected" class="hint">单击己方单位或建筑。右键地面移动，右键敌人攻击。资源靠对应建筑自动产出。</p>
     <EntityCard />
     <h2 v-if="store.selected">指令</h2>
     <p v-if="placing" class="hint">
       点击空地放置{{ placing.name }}（{{ buildHint(placing.buildCost, placing.buildTimeMs) }}）。资源在工人开始建造时扣除。
-      <template v-if="placing.harvest">建成后该工人并入建筑，之后自动产出{{ placing.harvest.resource === 'ore' ? '矿石' : placing.harvest.resource === 'gold' ? '金' : '木材' }}。</template>
+      <template v-if="placing.harvest">建成后该工人并入建筑，之后自动产出{{ harvestName(placing.harvest.resource) }}。</template>
     </p>
     <p v-else-if="store.mode === 'repair' && repair" class="hint">点击己方建筑维修：每 {{ formatDuration(repair.intervalMs) }}消耗矿 {{ repair.oreCost }}，回复 {{ repair.heal }} 生命。</p>
     <template v-if="store.selectedUnit">
+      <button v-if="commands.includes('BUILD') && farm" type="button" :disabled="!canAct" :class="{ short: shortOn(farm.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.farm)">
+        <span>建造粮田</span>
+        <small>{{ buildHint(farm.buildCost, farm.buildTimeMs) }} · 消耗工人</small>
+      </button>
       <button v-if="commands.includes('BUILD') && lumberCamp" type="button" :disabled="!canAct" :class="{ short: shortOn(lumberCamp.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.lumberCamp)">
         <span>建造伐木场</span>
         <small>{{ buildHint(lumberCamp.buildCost, lumberCamp.buildTimeMs) }} · 消耗工人</small>
       </button>
+      <button v-if="commands.includes('BUILD') && quarry" type="button" :disabled="!canAct" :class="{ short: shortOn(quarry.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.quarry)">
+        <span>建造采石场</span>
+        <small>{{ buildHint(quarry.buildCost, quarry.buildTimeMs) }} · 消耗工人</small>
+      </button>
       <button v-if="commands.includes('BUILD') && oreCamp" type="button" :disabled="!canAct" :class="{ short: shortOn(oreCamp.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.oreCamp)">
         <span>建造采矿场</span>
         <small>{{ buildHint(oreCamp.buildCost, oreCamp.buildTimeMs) }} · 消耗工人</small>
+      </button>
+      <button v-if="commands.includes('BUILD') && goldCamp" type="button" :disabled="!canAct" :class="{ short: shortOn(goldCamp.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.goldCamp)">
+        <span>建造金矿</span>
+        <small>{{ buildHint(goldCamp.buildCost, goldCamp.buildTimeMs) }} · 消耗工人</small>
       </button>
       <button v-if="commands.includes('BUILD') && barracks" type="button" :disabled="!canAct" :class="{ short: shortOn(barracks.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.barracks)">
         <span>建造兵营</span>

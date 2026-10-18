@@ -59,7 +59,7 @@ export function processRepair(state: GameState): void {
       continue
     }
     unit.repairProgressMs = 0
-    const cost = { wood: 0, ore: repair.oreCost, gold: 0 }
+    const cost = { food: 0, wood: 0, stone: 0, ore: repair.oreCost, gold: 0 }
     if (!canPay(player.resources, cost)) {
       idleUnit(unit)
       continue

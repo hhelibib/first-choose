@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useMatchStore } from '../store/match'
 import { BattleRenderer } from '../render/battle-renderer'
@@ -33,6 +33,13 @@ onBeforeUnmount(() => {
   renderer?.destroy()
   renderer = null
 })
+
+watch(
+  () => store.viewResetSeq,
+  () => {
+    renderer?.resetView()
+  },
+)
 
 function renderFrame(): void {
   if (!renderer || !snapshot.value || !config.value) {
@@ -157,7 +164,6 @@ const winnerText = () => {
 
 <template>
   <div class="game">
-    <HudBar />
     <div class="battlefield">
       <div ref="stageEl" class="stage" @contextmenu.prevent>
         <canvas
@@ -174,6 +180,7 @@ const winnerText = () => {
         <button type="button" @click="zoomOut">−</button>
         <button type="button" @click="resetView">复位</button>
       </div>
+      <HudBar />
       <MatchLog />
       <CommandPanel />
       <div v-if="store.paused" class="paused-note">已暂停</div>
@@ -191,14 +198,12 @@ const winnerText = () => {
 <style>
 .game {
   height: 100%;
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
 
 .battlefield {
-  position: relative;
-  flex: 1;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
 }
 
 .stage {

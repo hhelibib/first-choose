@@ -10,14 +10,16 @@ const gridPosSchema = z.object({
 })
 
 const resourcesSchema = z.object({
+  food: z.number().int().nonnegative().default(0),
   wood: z.number().int().nonnegative(),
+  stone: z.number().int().nonnegative().default(0),
   ore: z.number().int().nonnegative(),
   gold: z.number().int().nonnegative(),
 })
 
 const resourceNodeConfigSchema = z.object({
   id: z.string().min(1),
-  resource: z.enum(['wood', 'ore', 'gold']),
+  resource: z.enum(['food', 'wood', 'stone', 'ore', 'gold']),
   pos: gridPosSchema,
   amount: z.number().int().positive(),
 })
@@ -132,7 +134,7 @@ const buildingDefinitionSchema = z.object({
   ),
   harvest: z
     .object({
-      resource: z.enum(['wood', 'ore', 'gold']),
+      resource: z.enum(['food', 'wood', 'stone', 'ore', 'gold']),
       amount: z.number().int().positive(),
       intervalMs: z.number().int().positive(),
     })

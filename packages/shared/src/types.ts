@@ -19,11 +19,13 @@ export interface GridPos {
   y: number
 }
 
-export type ResourceType = 'wood' | 'ore' | 'gold'
+export type ResourceType = 'food' | 'wood' | 'stone' | 'ore' | 'gold'
 export type TerrainType = 'PASSABLE' | 'BLOCKED'
 
 export interface Resources {
+  food: number
   wood: number
+  stone: number
   ore: number
   gold: number
 }

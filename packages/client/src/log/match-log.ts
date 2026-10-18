@@ -144,7 +144,16 @@ export function linesFromEvents(
     }
     if (event.type === 'RESOURCE_GATHERED') {
       const who = event.playerId === localPlayerId ? '我方' : '敌方'
-      const name = event.resource === 'ore' ? '矿石' : event.resource === 'gold' ? '金' : '木材'
+      const name =
+        event.resource === 'food'
+          ? '粮'
+          : event.resource === 'stone'
+            ? '石'
+            : event.resource === 'ore'
+              ? '矿石'
+              : event.resource === 'gold'
+                ? '金'
+                : '木材'
       lines.push({
         ...base,
         text: `${who} 获得 ${name} ${event.amount}`,

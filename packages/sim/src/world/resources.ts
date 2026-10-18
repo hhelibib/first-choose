@@ -4,17 +4,27 @@
 import type { Resources } from '@battle/shared'
 
 export function canPay(have: Resources, cost: Resources): boolean {
-  return have.wood >= cost.wood && have.ore >= cost.ore && have.gold >= cost.gold
+  return (
+    have.food >= cost.food &&
+    have.wood >= cost.wood &&
+    have.stone >= cost.stone &&
+    have.ore >= cost.ore &&
+    have.gold >= cost.gold
+  )
 }
 
 export function pay(have: Resources, cost: Resources): void {
+  have.food -= cost.food
   have.wood -= cost.wood
+  have.stone -= cost.stone
   have.ore -= cost.ore
   have.gold -= cost.gold
 }
 
 export function refund(have: Resources, cost: Resources): void {
+  have.food += cost.food
   have.wood += cost.wood
+  have.stone += cost.stone
   have.ore += cost.ore
   have.gold += cost.gold
 }

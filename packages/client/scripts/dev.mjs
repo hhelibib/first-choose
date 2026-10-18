@@ -54,7 +54,7 @@ function vuePlugin() {
           .map((style) => compileStyle({ source: style.content, filename: args.path, id, scoped: style.scoped }).code)
           .join('\n')
         const injected = css
-          ? `\nconst __css = ${JSON.stringify(css)};\nif (typeof document !== 'undefined' && !document.getElementById(${JSON.stringify(id)})) { const el = document.createElement('style'); el.id = ${JSON.stringify(id)}; el.textContent = __css; document.head.appendChild(el); }\n`
+          ? `\nconst __css = ${JSON.stringify(css)};\nif (typeof document !== 'undefined') { let el = document.getElementById(${JSON.stringify(id)}); if (!el) { el = document.createElement('style'); el.id = ${JSON.stringify(id)}; document.head.appendChild(el); } el.textContent = __css; }\n`
           : ''
         const contents = `${script.content}\n${template.code}\n_sfc_main.render = render\n${injected}\nexport default _sfc_main`
         return {

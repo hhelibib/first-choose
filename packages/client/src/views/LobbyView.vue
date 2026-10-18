@@ -12,11 +12,11 @@ function setDifficulty(value: string) {
   <main class="lobby">
     <section class="panel">
       <h1>战斗吧</h1>
-      <p>15 秒下令，然后观看自走。本地 1 人 vs 规则 AI，色块战场。</p>
+      <p>30 秒下令，然后观看 15 秒自走。本地 1 人 vs 规则 AI，色块战场。</p>
       <label>
         地图
         <select disabled>
-          <option>默认 24×24</option>
+          <option>默认 50×50</option>
         </select>
       </label>
       <label>

@@ -2,7 +2,7 @@
  * 本地对局：浏览器内持有 sim，操作阶段用墙钟倒计时，自走阶段按 50ms 累加 tick。
  * AI 只在进入操作阶段时通过命令接口下令。
  */
-import { FIRST_OPERATION_MS, OPERATION_MS, TICK_MS, type CardTarget, type Command, type DomainEvent, type EntityRef, type GameSnapshot, type MatchConfig, type PlayerId } from '@battle/shared'
+import { OPERATION_MS, TICK_MS, type CardTarget, type Command, type DomainEvent, type EntityRef, type GameSnapshot, type MatchConfig, type PlayerId } from '@battle/shared'
 import { createSimulator, REJECT, type CommandResult, type Simulator } from '@battle/sim'
 import { planOperation, type RuleAIOptions } from '@battle/ai'
 import { cloneData } from './clone.js'
@@ -209,8 +209,7 @@ export class LocalMatchRunner implements MatchRunner {
       this.sim.startOperationPhase()
     }
     planOperation(this.sim, this.aiPlayerId, this.aiOptions)
-    const duration = this.sim.getState().round <= 1 ? FIRST_OPERATION_MS : OPERATION_MS
-    this.operationEndsAtMs = performance.now() + duration
+    this.operationEndsAtMs = performance.now() + OPERATION_MS
     this.frozenOperationRemainMs = null
     this.emitPhase()
     this.emitSnapshot([])

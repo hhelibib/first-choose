@@ -11,8 +11,10 @@ import {
   HAND_LIMIT,
   MAX_ENERGY,
   PHASE1_DECK_CARD_IDS,
+  STARTING_FOOD,
   STARTING_GOLD,
   STARTING_ORE,
+  STARTING_STONE,
   STARTING_WOOD,
   parseMatchConfig,
 } from '@battle/shared'
@@ -36,15 +38,22 @@ export const BUILDING_TYPE_IDS = {
   mainBase: 'main-base',
   barracks: 'barracks',
   arrowTower: 'arrow-tower',
+  farm: 'farm',
   lumberCamp: 'lumber-camp',
+  quarry: 'quarry',
   oreCamp: 'ore-camp',
+  goldCamp: 'gold-camp',
 } as const
+
+function cost(partial: Partial<Resources>): Resources {
+  return { food: 0, wood: 0, stone: 0, ore: 0, gold: 0, ...partial }
+}
 
 export const unitDefinitions: Record<string, UnitDefinition> = {
   [UNIT_TYPE_IDS.worker]: {
     id: UNIT_TYPE_IDS.worker,
     name: '工人',
-    description: '建造资源建筑、兵营和防御。建成伐木场或采矿场后该工人会并入建筑。不会主动攻击。',
+    description: '建造资源建筑、兵营和防御。建成粮田、伐木场、采石场、采矿场或金矿后该工人会并入建筑。不会主动攻击。',
     role: 'WORKER',
     hp: 40,
     attack: 0,
@@ -91,9 +100,9 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
     attack: 0,
     attackIntervalMs: 0,
     attackRange: 0,
-    buildCost: { wood: 0, ore: 0, gold: 0 },
+    buildCost: cost({}),
     buildTimeMs: 0,
-    production: [{ unitTypeId: UNIT_TYPE_IDS.worker, cost: { wood: 50, ore: 0, gold: 0 }, timeMs: 5000 }],
+    production: [{ unitTypeId: UNIT_TYPE_IDS.worker, cost: cost({ wood: 50 }), timeMs: 5000 }],
   },
   [BUILDING_TYPE_IDS.barracks]: {
     id: BUILDING_TYPE_IDS.barracks,
@@ -106,9 +115,9 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
     attack: 0,
     attackIntervalMs: 0,
     attackRange: 0,
-    buildCost: { wood: 80, ore: 40, gold: 0 },
+    buildCost: cost({ wood: 80, ore: 40 }),
     buildTimeMs: 10000,
-    production: [{ unitTypeId: UNIT_TYPE_IDS.fighter, cost: { wood: 0, ore: 40, gold: 0 }, timeMs: 8000 }],
+    production: [{ unitTypeId: UNIT_TYPE_IDS.fighter, cost: cost({ ore: 40 }), timeMs: 8000 }],
   },
   [BUILDING_TYPE_IDS.arrowTower]: {
     id: BUILDING_TYPE_IDS.arrowTower,
@@ -121,7 +130,7 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
     attack: 8,
     attackIntervalMs: 800,
     attackRange: 3,
-    buildCost: { wood: 40, ore: 60, gold: 0 },
+    buildCost: cost({ wood: 40, ore: 60 }),
     buildTimeMs: 8000,
     production: [],
   },
@@ -136,10 +145,42 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
     attack: 0,
     attackIntervalMs: 0,
     attackRange: 0,
-    buildCost: { wood: 60, ore: 0, gold: 0 },
+    buildCost: cost({ wood: 60 }),
     buildTimeMs: 6000,
     production: [],
     harvest: { resource: 'wood', amount: 8, intervalMs: 1000 },
+  },
+  [BUILDING_TYPE_IDS.farm]: {
+    id: BUILDING_TYPE_IDS.farm,
+    name: '粮田',
+    description: '建成后消耗工人，之后每秒自动产出粮食。',
+    role: 'RESOURCE',
+    hp: 180,
+    armor: 0,
+    size: { w: 1, h: 1 },
+    attack: 0,
+    attackIntervalMs: 0,
+    attackRange: 0,
+    buildCost: cost({ wood: 40 }),
+    buildTimeMs: 5000,
+    production: [],
+    harvest: { resource: 'food', amount: 6, intervalMs: 1000 },
+  },
+  [BUILDING_TYPE_IDS.quarry]: {
+    id: BUILDING_TYPE_IDS.quarry,
+    name: '采石场',
+    description: '建成后消耗工人，之后每秒自动产出石料。',
+    role: 'RESOURCE',
+    hp: 210,
+    armor: 0,
+    size: { w: 1, h: 1 },
+    attack: 0,
+    attackIntervalMs: 0,
+    attackRange: 0,
+    buildCost: cost({ wood: 40, ore: 10 }),
+    buildTimeMs: 7000,
+    production: [],
+    harvest: { resource: 'stone', amount: 6, intervalMs: 1000 },
   },
   [BUILDING_TYPE_IDS.oreCamp]: {
     id: BUILDING_TYPE_IDS.oreCamp,
@@ -152,10 +193,26 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
     attack: 0,
     attackIntervalMs: 0,
     attackRange: 0,
-    buildCost: { wood: 40, ore: 30, gold: 0 },
+    buildCost: cost({ wood: 40, ore: 30 }),
     buildTimeMs: 8000,
     production: [],
     harvest: { resource: 'ore', amount: 5, intervalMs: 1000 },
+  },
+  [BUILDING_TYPE_IDS.goldCamp]: {
+    id: BUILDING_TYPE_IDS.goldCamp,
+    name: '金矿',
+    description: '建成后消耗工人，之后每秒自动产出金。',
+    role: 'RESOURCE',
+    hp: 240,
+    armor: 0,
+    size: { w: 1, h: 1 },
+    attack: 0,
+    attackIntervalMs: 0,
+    attackRange: 0,
+    buildCost: cost({ wood: 50, ore: 40 }),
+    buildTimeMs: 10000,
+    production: [],
+    harvest: { resource: 'gold', amount: 2, intervalMs: 1000 },
   },
 }
 
@@ -194,21 +251,21 @@ function makeTerrain(width: number, height: number, blocked: GridPos[]): Terrain
 }
 
 const DEFAULT_BLOCKED: GridPos[] = [
-  { x: 5, y: 11 },
-  { x: 6, y: 11 },
-  { x: 7, y: 11 },
-  { x: 8, y: 11 },
-  { x: 15, y: 12 },
-  { x: 16, y: 12 },
-  { x: 17, y: 12 },
-  { x: 18, y: 12 },
+  { x: 12, y: 24 },
+  { x: 13, y: 24 },
+  { x: 14, y: 24 },
+  { x: 15, y: 24 },
+  { x: 34, y: 25 },
+  { x: 35, y: 25 },
+  { x: 36, y: 25 },
+  { x: 37, y: 25 },
 ]
 
 export function createDefaultMatchConfig(): MatchConfig {
   return parseMatchConfig({
-    id: 'default-24x24',
+    id: 'default-50x50',
     map: {
-      id: 'default-24x24',
+      id: 'default-50x50',
       width: DEFAULT_MAP_WIDTH,
       height: DEFAULT_MAP_HEIGHT,
       terrain: makeTerrain(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, DEFAULT_BLOCKED),
@@ -225,13 +282,13 @@ export function createDefaultMatchConfig(): MatchConfig {
           ],
         },
         {
-          start: { x: 20, y: 20 },
+          start: { x: 46, y: 46 },
           teamId: 1,
-          buildings: [{ typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 20, y: 20 } }],
+          buildings: [{ typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 46, y: 46 } }],
           units: [
-            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 19, y: 20 } },
-            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 20, y: 19 } },
-            { typeId: UNIT_TYPE_IDS.fighter, pos: { x: 19, y: 19 } },
+            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 45, y: 46 } },
+            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 46, y: 45 } },
+            { typeId: UNIT_TYPE_IDS.fighter, pos: { x: 45, y: 45 } },
           ],
         },
       ],
@@ -250,7 +307,13 @@ export function createDefaultMatchConfig(): MatchConfig {
     },
     repair: { intervalMs: 1000, oreCost: 1, heal: 20 },
     populationCap: DEFAULT_POPULATION_CAP,
-    startingResources: { wood: STARTING_WOOD, ore: STARTING_ORE, gold: STARTING_GOLD },
+    startingResources: {
+      food: STARTING_FOOD,
+      wood: STARTING_WOOD,
+      stone: STARTING_STONE,
+      ore: STARTING_ORE,
+      gold: STARTING_GOLD,
+    },
     maxEnergy: MAX_ENERGY,
     energyPerRound: ENERGY_PER_ROUND,
     handLimit: HAND_LIMIT,
@@ -265,7 +328,7 @@ export function createTestMatchConfig(spec: {
   units?: Array<{ ownerIndex: number; typeId: string; pos: GridPos }>
   buildings?: Array<{ ownerIndex: number; typeId: string; origin: GridPos }>
   resourceNodes?: ResourceNodeConfig[]
-  startingResources?: Resources
+  startingResources?: Partial<Resources>
   populationCap?: number
   deckCardIds?: string[]
 }): MatchConfig {
@@ -277,7 +340,7 @@ export function createTestMatchConfig(spec: {
   return parseMatchConfig({
     ...defaults,
     id: 'test-map',
-    startingResources: spec.startingResources ?? defaults.startingResources,
+    startingResources: { ...defaults.startingResources, ...spec.startingResources },
     populationCap: spec.populationCap ?? defaults.populationCap,
     deckCardIds: spec.deckCardIds ?? defaults.deckCardIds,
     map: {

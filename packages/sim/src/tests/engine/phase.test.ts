@@ -62,11 +62,11 @@ describe('阶段机', () => {
     assert.equal(AUTO_TICK_LIMIT, 300)
   })
 
-  it('默认 24×24 对局可以开局', () => {
+  it('默认 50×50 对局可以开局', () => {
     const sim = createSimulator()
     sim.startMatch()
-    assert.equal(sim.getState().map.width, 24)
-    assert.equal(sim.getState().map.height, 24)
+    assert.equal(sim.getState().map.width, 50)
+    assert.equal(sim.getState().map.height, 50)
     assert.equal(Object.keys(sim.getState().units).length, 6)
     assert.equal(Object.keys(sim.getState().buildings).length, 2)
   })

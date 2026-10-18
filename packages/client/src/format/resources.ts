@@ -1,15 +1,23 @@
-import type { Resources } from '@battle/shared'
+import type { ResourceType, Resources } from '@battle/shared'
+
+const LABELS: Record<ResourceType, string> = {
+  food: '粮',
+  wood: '木',
+  stone: '石',
+  ore: '矿',
+  gold: '金',
+}
+
+export function resourceLabel(type: ResourceType): string {
+  return LABELS[type]
+}
 
 export function formatResources(cost: Resources): string {
   const parts: string[] = []
-  if (cost.wood > 0) {
-    parts.push(`木 ${cost.wood}`)
-  }
-  if (cost.ore > 0) {
-    parts.push(`矿 ${cost.ore}`)
-  }
-  if (cost.gold > 0) {
-    parts.push(`金 ${cost.gold}`)
+  for (const key of ['food', 'wood', 'stone', 'ore', 'gold'] as const) {
+    if (cost[key] > 0) {
+      parts.push(`${LABELS[key]} ${cost[key]}`)
+    }
   }
   return parts.length > 0 ? parts.join(' · ') : '免费'
 }
@@ -23,5 +31,11 @@ export function canAfford(have: Resources | null | undefined, cost: Resources): 
   if (!have) {
     return false
   }
-  return have.wood >= cost.wood && have.ore >= cost.ore && have.gold >= cost.gold
+  return (
+    have.food >= cost.food &&
+    have.wood >= cost.wood &&
+    have.stone >= cost.stone &&
+    have.ore >= cost.ore &&
+    have.gold >= cost.gold
+  )
 }

@@ -5,23 +5,22 @@
 export const TICK_MS = 50
 
 /** 操作阶段墙钟时长。倒计时放在 Runner，不进入权威状态。 */
-export const OPERATION_MS = 15_000
-
-/** 第 1 回合操作阶段更长，方便熟悉界面。 */
-export const FIRST_OPERATION_MS = 30_000
+export const OPERATION_MS = 30_000
 
 /** 自走阶段 tick 上限，对应 15 秒。 */
 export const AUTO_TICK_LIMIT = 300
 
-export const DEFAULT_MAP_WIDTH = 24
-export const DEFAULT_MAP_HEIGHT = 24
+export const DEFAULT_MAP_WIDTH = 50
+export const DEFAULT_MAP_HEIGHT = 50
 
 export const MAX_ENERGY = 10
 export const ENERGY_PER_ROUND = 3
 export const HAND_LIMIT = 5
-export const DEFAULT_POPULATION_CAP = 20
+export const DEFAULT_POPULATION_CAP = 100
 
+export const STARTING_FOOD = 80
 export const STARTING_WOOD = 100
+export const STARTING_STONE = 40
 export const STARTING_ORE = 50
 export const STARTING_GOLD = 0
 

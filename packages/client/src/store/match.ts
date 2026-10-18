@@ -39,6 +39,7 @@ export const useMatchStore = defineStore('match', {
     logSeq: 0,
     winnerId: null as string | null,
     winnerCondition: '',
+    viewResetSeq: 0,
   }),
   getters: {
     player(state) {
@@ -215,10 +216,16 @@ export const useMatchStore = defineStore('match', {
       this.resetInteraction()
     },
     togglePause() {
+      this.setPaused(!this.paused)
+    },
+    setPaused(paused: boolean) {
       if (!this.gateway || this.snapshot?.phase === 'GAME_OVER') {
         return
       }
-      this.gateway.setPaused(!this.paused)
+      this.gateway.setPaused(paused)
+    },
+    requestViewReset() {
+      this.viewResetSeq += 1
     },
     onLeftClick(pos: GridPos) {
       if (!this.snapshot) {
