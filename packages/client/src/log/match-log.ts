@@ -2,6 +2,8 @@
  * 对局日志文案。只读快照与领域事件，不写 sim。
  */
 import type { Command, DomainEvent, GameSnapshot, MatchConfig } from '@battle/shared'
+import { resourceFull } from '../format/resources.js'
+import { buildingName, cardName, commandName, t, unitName } from '../i18n/index.js'
 
 export type LogTone = 'order' | 'combat' | 'econ' | 'system'
 
@@ -24,42 +26,44 @@ export interface CurrentOrder {
 
 export function formatCommand(command: Command | null, config: MatchConfig): string {
   if (!command) {
-    return '空闲'
+    return t('cmd.idle')
   }
   switch (command.type) {
     case 'MOVE':
-      return `移动 (${command.to.x},${command.to.y})`
+      return t('cmd.moveTo', { x: command.to.x, y: command.to.y })
     case 'ATTACK':
-      return `攻击 ${command.target.id}`
+      return t('cmd.attackId', { id: command.target.id })
     case 'PATROL':
-      return '巡逻'
+      return commandName('PATROL')
     case 'GATHER':
-      return '采集'
+      return commandName('GATHER')
     case 'BUILD':
-      return `建造${config.buildings[command.buildingTypeId]?.name ?? command.buildingTypeId}`
+      return t('cmd.build', {
+        name: buildingName(command.buildingTypeId, config.buildings[command.buildingTypeId]?.name),
+      })
     case 'REPAIR':
-      return `维修 ${command.target.id}`
+      return t('cmd.repairId', { id: command.target.id })
     case 'PRODUCE':
-      return `生产${config.units[command.unitTypeId]?.name ?? command.unitTypeId}`
+      return t('cmd.produce', { name: unitName(command.unitTypeId, config.units[command.unitTypeId]?.name) })
     case 'STOP':
-      return '停止'
+      return commandName('STOP')
   }
 }
 
 export function entityLabel(snapshot: GameSnapshot, config: MatchConfig, id: string, localPlayerId: string): string {
   const unit = snapshot.units[id]
   if (unit) {
-    const name = config.units[unit.typeId]?.name ?? unit.typeId
+    const name = unitName(unit.typeId, config.units[unit.typeId]?.name)
     return `${side(unit.ownerId, localPlayerId)}${name}`
   }
   const building = snapshot.buildings[id]
   if (building) {
-    const name = config.buildings[building.typeId]?.name ?? building.typeId
+    const name = buildingName(building.typeId, config.buildings[building.typeId]?.name)
     return `${side(building.ownerId, localPlayerId)}${name}`
   }
   const card = config.cards[id]
   if (card) {
-    return card.name
+    return cardName(id, card.name)
   }
   return id
 }
@@ -72,7 +76,7 @@ export function currentOrders(snapshot: GameSnapshot, config: MatchConfig, local
     if (!unit || unit.state === 'DEAD') {
       continue
     }
-    const name = config.units[unit.typeId]?.name ?? unit.typeId
+    const name = unitName(unit.typeId, config.units[unit.typeId]?.name)
     rows.push({
       id,
       kind: 'unit',
@@ -87,7 +91,7 @@ export function currentOrders(snapshot: GameSnapshot, config: MatchConfig, local
     if (!building || building.state === 'DESTROYED') {
       continue
     }
-    const name = config.buildings[building.typeId]?.name ?? building.typeId
+    const name = buildingName(building.typeId, config.buildings[building.typeId]?.name)
     rows.push({
       id,
       kind: 'building',
@@ -116,7 +120,7 @@ export function linesFromEvents(
       const target = entityLabel(snapshot, config, event.targetId, localPlayerId)
       lines.push({
         ...base,
-        text: `${attacker} 攻击 ${target}`,
+        text: t('log.attack', { a: attacker, b: target }),
         relatedIds: [event.attackerId, event.targetId],
         tone: 'combat',
       })
@@ -127,7 +131,9 @@ export function linesFromEvents(
       const source = event.sourceId ? entityLabel(snapshot, config, event.sourceId, localPlayerId) : ''
       lines.push({
         ...base,
-        text: source ? `${source} 对 ${target} 造成 ${event.amount} 伤害` : `${target} 受到 ${event.amount} 伤害`,
+        text: source
+          ? t('log.damage', { src: source, tgt: target, n: event.amount })
+          : t('log.hurt', { tgt: target, n: event.amount }),
         relatedIds: [event.targetId, event.sourceId].filter((id): id is string => !!id),
         tone: 'combat',
       })
@@ -136,27 +142,17 @@ export function linesFromEvents(
     if (event.type === 'UNIT_DIED') {
       lines.push({
         ...base,
-        text: `${entityLabel(snapshot, config, event.unitId, localPlayerId)} 阵亡`,
+        text: t('log.died', { name: entityLabel(snapshot, config, event.unitId, localPlayerId) }),
         relatedIds: [event.unitId],
         tone: 'combat',
       })
       continue
     }
     if (event.type === 'RESOURCE_GATHERED') {
-      const who = event.playerId === localPlayerId ? '我方' : '敌方'
-      const name =
-        event.resource === 'food'
-          ? '粮'
-          : event.resource === 'stone'
-            ? '石'
-            : event.resource === 'ore'
-              ? '矿石'
-              : event.resource === 'gold'
-                ? '金'
-                : '木材'
+      const who = event.playerId === localPlayerId ? t('side.mine').trim() : t('side.enemy').trim()
       lines.push({
         ...base,
-        text: `${who} 获得 ${name} ${event.amount}`,
+        text: t('log.gain', { who, res: resourceFull(event.resource), n: event.amount }),
         relatedIds: [],
         tone: 'econ',
       })
@@ -165,7 +161,7 @@ export function linesFromEvents(
     if (event.type === 'BUILDING_PLACED') {
       lines.push({
         ...base,
-        text: `${entityLabel(snapshot, config, event.buildingId, localPlayerId)} 建成`,
+        text: t('log.built', { name: entityLabel(snapshot, config, event.buildingId, localPlayerId) }),
         relatedIds: [event.buildingId],
         tone: 'econ',
       })
@@ -174,7 +170,10 @@ export function linesFromEvents(
     if (event.type === 'PRODUCTION_COMPLETED') {
       lines.push({
         ...base,
-        text: `${entityLabel(snapshot, config, event.buildingId, localPlayerId)} 生产出 ${entityLabel(snapshot, config, event.unitId, localPlayerId)}`,
+        text: t('log.spawned', {
+          b: entityLabel(snapshot, config, event.buildingId, localPlayerId),
+          u: entityLabel(snapshot, config, event.unitId, localPlayerId),
+        }),
         relatedIds: [event.buildingId, event.unitId],
         tone: 'econ',
       })
@@ -183,18 +182,21 @@ export function linesFromEvents(
     if (event.type === 'WORKER_CONSUMED') {
       lines.push({
         ...base,
-        text: `${entityLabel(snapshot, config, event.unitId, localPlayerId)} 并入 ${entityLabel(snapshot, config, event.buildingId, localPlayerId)}`,
+        text: t('log.join', {
+          u: entityLabel(snapshot, config, event.unitId, localPlayerId),
+          b: entityLabel(snapshot, config, event.buildingId, localPlayerId),
+        }),
         relatedIds: [event.unitId, event.buildingId],
         tone: 'econ',
       })
       continue
     }
     if (event.type === 'CARD_PLAYED') {
-      const who = event.playerId === localPlayerId ? '我方' : '敌方'
-      const card = config.cards[event.cardId]?.name ?? event.cardId
+      const who = event.playerId === localPlayerId ? t('side.mine').trim() : t('side.enemy').trim()
+      const card = cardName(event.cardId, config.cards[event.cardId]?.name)
       lines.push({
         ...base,
-        text: `${who} 打出 ${card}`,
+        text: t('log.card', { who, card }),
         relatedIds: [],
         tone: 'system',
       })
@@ -203,10 +205,10 @@ export function linesFromEvents(
     if (event.type === 'VICTORY') {
       const text =
         event.condition === 'MUTUAL_DESTRUCTION'
-          ? '双方主基地同时被摧毁'
+          ? t('log.victoryDraw')
           : event.winnerId === localPlayerId
-            ? '我方摧毁敌方主基地，获胜'
-            : '敌方摧毁我方主基地'
+            ? t('log.victoryWin')
+            : t('log.victoryLose')
       lines.push({ ...base, text, relatedIds: [], tone: 'system' })
     }
   }
@@ -242,14 +244,14 @@ export function linesFromCommandDiff(
     if (!unit.command) {
       lines.push({
         ...base,
-        text: `${who} ${completeVerb(before?.command ?? null)}`,
+        text: t('log.complete', { who, verb: completeVerb(before?.command ?? null) }),
         relatedIds: [id],
         tone: 'order',
       })
     } else {
       lines.push({
         ...base,
-        text: `${who} 下令 ${formatCommand(unit.command, config)}`,
+        text: t('log.ordered', { who, cmd: formatCommand(unit.command, config) }),
         relatedIds: [id, ...commandIds(unit.command)],
         tone: 'order',
       })
@@ -265,7 +267,7 @@ export function linesFromCommandDiff(
     if (before && before.state !== 'DESTROYED' && building.state === 'DESTROYED') {
       lines.push({
         ...base,
-        text: `${entityLabel(next, config, id, localPlayerId)} 被摧毁`,
+        text: t('log.destroyed', { name: entityLabel(next, config, id, localPlayerId) }),
         relatedIds: [id],
         tone: 'combat',
       })
@@ -283,14 +285,14 @@ export function linesFromCommandDiff(
       }
       lines.push({
         ...base,
-        text: `${who} 停止生产`,
+        text: t('log.stopProd', { who }),
         relatedIds: [id],
         tone: 'order',
       })
     } else {
       lines.push({
         ...base,
-        text: `${who} 下令 ${formatCommand(building.command, config)}`,
+        text: t('log.ordered', { who, cmd: formatCommand(building.command, config) }),
         relatedIds: [id],
         tone: 'order',
       })
@@ -300,7 +302,7 @@ export function linesFromCommandDiff(
 }
 
 function side(ownerId: string, localPlayerId: string): string {
-  return ownerId === localPlayerId ? '我方' : '敌方'
+  return ownerId === localPlayerId ? t('side.mine') : t('side.enemy')
 }
 
 function commandKey(command: Command | null): string {
@@ -319,19 +321,19 @@ function commandIds(command: Command): string[] {
 
 function completeVerb(command: Command | null): string {
   if (command?.type === 'MOVE') {
-    return '完成移动'
+    return t('log.doneMove')
   }
   if (command?.type === 'ATTACK') {
-    return '停止攻击'
+    return t('log.stopAtk')
   }
   if (command?.type === 'GATHER') {
-    return '结束采集'
+    return t('log.endGather')
   }
   if (command?.type === 'BUILD') {
-    return '结束建造'
+    return t('log.endBuild')
   }
   if (command?.type === 'REPAIR') {
-    return '结束维修'
+    return t('log.endRepair')
   }
-  return '停止'
+  return t('log.stop')
 }

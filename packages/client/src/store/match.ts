@@ -10,6 +10,7 @@ import { BUILDING_TYPE_IDS, UNIT_TYPE_IDS } from '@battle/sim'
 import type { RuleAIOptions } from '@battle/ai'
 import { createLocalGateway, type MatchGateway, type PhaseInfo } from '../gateway/index.js'
 import { pickAt } from '../preview/pick.js'
+import { t } from '../i18n/index.js'
 import { linesFromCommandDiff, linesFromEvents, type MatchLogEntry } from '../log/match-log.js'
 
 export type InteractionMode = 'select' | 'build' | 'patrol' | 'repair' | 'card'
@@ -40,6 +41,9 @@ export const useMatchStore = defineStore('match', {
     winnerId: null as string | null,
     winnerCondition: '',
     viewResetSeq: 0,
+    commandAnchor: null as { x: number; y: number; w: number; h: number } | null,
+    inspectorPos: null as { x: number; y: number } | null,
+    showOrderHints: readOrderHintsPref(),
   }),
   getters: {
     player(state) {
@@ -59,6 +63,9 @@ export const useMatchStore = defineStore('match', {
     },
     isOperation(state) {
       return state.snapshot?.phase === 'OPERATION'
+    },
+    isTargeting(state) {
+      return state.mode === 'build' || state.mode === 'patrol' || state.mode === 'repair' || state.mode === 'card'
     },
     paused(state) {
       return state.phaseInfo?.paused === true
@@ -106,7 +113,12 @@ export const useMatchStore = defineStore('match', {
               {
                 round: info.round,
                 tick: this.snapshot?.tick ?? 0,
-                text: info.phase === 'OPERATION' ? `第 ${info.round} 回合进入操作阶段` : info.phase === 'AUTO' ? '进入自走阶段' : `阶段：${info.phase}`,
+                text:
+                  info.phase === 'OPERATION'
+                    ? t('log.enterOp', { n: info.round })
+                    : info.phase === 'AUTO'
+                      ? t('log.enterAuto')
+                      : t('log.phase', { phase: info.phase }),
                 relatedIds: [],
                 tone: 'system',
               },
@@ -117,7 +129,7 @@ export const useMatchStore = defineStore('match', {
           }
         },
         onCommandAck: (ack) => {
-          this.lastReason = ack.accepted ? '' : (ack.reason ?? '指令被拒绝')
+          this.lastReason = ack.accepted ? '' : (ack.reason ?? 'reject.generic')
         },
         onGameOver: (winnerId, condition) => {
           this.winnerId = winnerId
@@ -163,6 +175,9 @@ export const useMatchStore = defineStore('match', {
       this.cardInstanceId = null
       this.patrolPoints = []
     },
+    cancelTargeting() {
+      this.resetInteraction()
+    },
     pruneSelection() {
       if (!this.snapshot || !this.selected) {
         return
@@ -181,12 +196,12 @@ export const useMatchStore = defineStore('match', {
     },
     sendCommand(target: EntityRef, command: Command) {
       if (!this.gateway || !this.isOperation) {
-        this.lastReason = '当前阶段不能下达指令'
+        this.lastReason = 'reject.WRONG_PHASE'
         return
       }
       const result = this.gateway.submitCommand(this.localPlayerId, target, command)
       if (result.accepted) {
-        this.resetInteraction()
+        this.closeCommandPopup()
       }
     },
     sendClear() {
@@ -195,12 +210,21 @@ export const useMatchStore = defineStore('match', {
       }
       const result = this.gateway.clearCommand(this.localPlayerId, this.selected)
       if (result.accepted) {
-        this.resetInteraction()
+        this.closeCommandPopup()
       }
+    },
+    closeCommandPopup() {
+      this.resetInteraction()
+      this.selected = null
+      this.commandAnchor = null
+    },
+    setShowOrderHints(value: boolean) {
+      this.showOrderHints = value
+      writeOrderHintsPref(value)
     },
     sendCard(target: CardTarget) {
       if (!this.gateway || !this.cardInstanceId || !this.isOperation) {
-        this.lastReason = '当前阶段不能出牌'
+        this.lastReason = 'reject.cardPhase'
         return
       }
       const result = this.gateway.playCard(this.localPlayerId, this.cardInstanceId, target)
@@ -251,7 +275,7 @@ export const useMatchStore = defineStore('match', {
         if (hit.kind === 'building' && hit.building.ownerId === this.localPlayerId) {
           this.sendCommand(this.selected, { type: 'REPAIR', target: { kind: 'building', id: hit.building.id } })
         } else {
-          this.lastReason = '请选择己方建筑'
+          this.lastReason = 'reject.ownBuilding'
         }
         return
       }
@@ -270,6 +294,10 @@ export const useMatchStore = defineStore('match', {
       this.resetInteraction()
     },
     onRightClick(pos: GridPos) {
+      if (this.isTargeting) {
+        this.cancelTargeting()
+        return
+      }
       if (!this.snapshot || !this.isOperation || this.selected?.kind !== 'unit') {
         return
       }
@@ -341,10 +369,32 @@ export const useMatchStore = defineStore('match', {
         this.sendCard({ type: 'UNIT', id: hit.unit.id })
         return
       }
-      this.lastReason = '卡牌目标非法'
+      this.lastReason = 'reject.cardTarget'
     },
   },
 })
+
+const ORDER_HINTS_KEY = 'battle-ba-order-hints'
+
+function readOrderHintsPref(): boolean {
+  try {
+    const saved = localStorage.getItem(ORDER_HINTS_KEY)
+    if (saved === '0') {
+      return false
+    }
+  } catch {
+    /* ignore */
+  }
+  return true
+}
+
+function writeOrderHintsPref(value: boolean): void {
+  try {
+    localStorage.setItem(ORDER_HINTS_KEY, value ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
 
 function difficultyOptions(difficulty: AiDifficulty): RuleAIOptions {
   if (difficulty === 'conservative') {

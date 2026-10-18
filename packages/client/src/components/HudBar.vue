@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { TICK_MS } from '@battle/shared'
+import { locale, localeModel, t, translateReason } from '../i18n/index'
 import { useMatchStore } from '../store/match'
 
 const store = useMatchStore()
@@ -41,11 +42,12 @@ function closeSettings(): void {
 
 const phaseText = computed(() => {
   const phase = store.snapshot?.phase
-  if (phase === 'OPERATION') return '操作阶段'
-  if (phase === 'AUTO') return '自走阶段'
-  if (phase === 'GAME_OVER') return '对局结束'
+  if (phase === 'OPERATION') return t('hud.phase.OPERATION')
+  if (phase === 'AUTO') return t('hud.phase.AUTO')
+  if (phase === 'GAME_OVER') return t('hud.phase.GAME_OVER')
   return phase ?? ''
 })
+
 
 const remainMs = computed(() => {
   if (store.snapshot?.phase === 'OPERATION') {
@@ -81,28 +83,28 @@ function leave(): void {
 </script>
 
 <template>
-  <header v-if="store.snapshot && store.player" class="hud">
+  <header v-if="store.snapshot && store.player" class="hud" :data-locale="locale">
     <div class="hud-resources">
-      <span>粮 {{ store.player.resources.food }}</span>
-      <span>木 {{ store.player.resources.wood }}</span>
-      <span>石 {{ store.player.resources.stone }}</span>
-      <span>矿 {{ store.player.resources.ore }}</span>
-      <span>金 {{ store.player.resources.gold }}</span>
-      <span class="pop">人口 {{ store.player.population }}/{{ store.player.populationCap }}</span>
+      <span>{{ t('hud.food') }} {{ store.player.resources.food }}</span>
+      <span>{{ t('hud.wood') }} {{ store.player.resources.wood }}</span>
+      <span>{{ t('hud.stone') }} {{ store.player.resources.stone }}</span>
+      <span>{{ t('hud.ore') }} {{ store.player.resources.ore }}</span>
+      <span>{{ t('hud.gold') }} {{ store.player.resources.gold }}</span>
+      <span class="pop">{{ t('hud.pop', { cur: store.player.population, cap: store.player.populationCap }) }}</span>
     </div>
     <div class="hud-clock">
-      <span class="round">第 {{ store.snapshot.round }} 回合</span>
+      <span class="round">{{ t('hud.round', { n: store.snapshot.round }) }}</span>
       <span class="count">{{ countdown }}</span>
       <span class="phase">{{ phaseText }}</span>
     </div>
     <div class="hud-right">
       <button type="button" :disabled="store.snapshot.phase === 'GAME_OVER'" @click="store.togglePause()">
-        {{ store.paused ? '继续' : '暂停' }}
+        {{ store.paused ? t('hud.resume') : t('hud.pause') }}
       </button>
-      <button type="button" :disabled="!store.isOperation" @click="store.endOperation()">结束操作</button>
-      <span v-if="store.paused" class="paused">已暂停</span>
+      <button type="button" :disabled="!store.isOperation" @click="store.endOperation()">{{ t('hud.endOp') }}</button>
+      <span v-if="store.paused" class="paused">{{ t('hud.paused') }}</span>
       <div class="settings">
-        <button type="button" class="icon" title="设置" aria-label="设置" @click="openSettings">
+        <button type="button" class="icon" :title="t('hud.settings')" :aria-label="t('hud.settings')" @click="openSettings">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
             <path
               fill="currentColor"
@@ -118,15 +120,32 @@ function leave(): void {
       @pointerdown.self="closeSettings"
     >
       <div ref="settingsEl" class="game-settings-dialog" @pointerdown.stop>
-        <h2>设置</h2>
-        <p class="hint">游戏已暂停</p>
-        <button type="button" @click="resetView">复位视角</button>
-        <button type="button" @click="leave">返回大厅</button>
-        <button type="button" class="primary" @click="resume">继续游戏</button>
-        <button type="button" class="ghost" @click="closeSettings">关闭</button>
+        <h2>{{ t('hud.settings') }}</h2>
+        <p class="hint">{{ t('hud.settingsHint') }}</p>
+        <label class="lang">
+          {{ t('lang.label') }}
+          <select v-model="localeModel">
+            <option value="zh-CN">{{ t('lang.zhCN') }}</option>
+            <option value="zh-TW">{{ t('lang.zhTW') }}</option>
+            <option value="en">{{ t('lang.en') }}</option>
+          </select>
+        </label>
+        <label class="check">
+          <input
+            type="checkbox"
+            :checked="store.showOrderHints"
+            @change="store.setShowOrderHints(($event.target as HTMLInputElement).checked)"
+          />
+          {{ t('hud.orderHints') }}
+        </label>
+        <p class="hint muted">{{ t('hud.orderHintsHint') }}</p>
+        <button type="button" @click="resetView">{{ t('hud.resetView') }}</button>
+        <button type="button" @click="leave">{{ t('hud.lobby') }}</button>
+        <button type="button" class="primary" @click="resume">{{ t('hud.resumeGame') }}</button>
+        <button type="button" class="ghost" @click="closeSettings">{{ t('hud.close') }}</button>
       </div>
     </div>
-    <p v-if="store.lastReason" class="reason">{{ store.lastReason }}</p>
+    <p v-if="store.lastReason" class="reason">{{ translateReason(store.lastReason) }}</p>
   </header>
 </template>
 
@@ -276,6 +295,33 @@ function leave(): void {
   margin: 0 0 6px;
   color: #ffe066;
   font-size: 13px;
+}
+
+.game-settings-dialog .lang {
+  display: grid;
+  gap: 6px;
+  color: #c5d0db;
+  font-size: 13px;
+}
+
+.game-settings-dialog .lang select {
+  padding: 8px 12px;
+  border: 1px solid #3d4b5c;
+  background: #0f141b;
+  color: #e8edf2;
+}
+
+.game-settings-dialog .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e8edf2;
+  font-size: 13px;
+}
+
+.game-settings-dialog .hint.muted {
+  color: #9aabbc;
+  font-size: 12px;
 }
 
 .game-settings-dialog button {

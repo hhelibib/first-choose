@@ -17,6 +17,8 @@ export const COLOR = {
   buildingP1: 0xb44545,
   constructing: 0x6b5b3a,
   selected: 0xffe066,
+  orderIdle: 0xff9f43,
+  orderSet: 0x3ecf6e,
   hover: 0x9ad1ff,
   path: 0xf5d76e,
   moveRange: 0x5ec8e8,

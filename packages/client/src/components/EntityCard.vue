@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useMatchStore } from '../store/match'
-import { formatDuration, formatResources } from '../format/resources'
+import { formatDuration, formatResources, resourceFull } from '../format/resources'
+import { buildingDesc, buildingName, commandName, t, unitDesc, unitName } from '../i18n/index'
 
 const store = useMatchStore()
 
@@ -13,107 +14,90 @@ const hasBuildCost = computed(() => {
 })
 
 function commandLabel(type: string | undefined): string {
-  switch (type) {
-    case 'MOVE':
-      return '移动'
-    case 'ATTACK':
-      return '攻击'
-    case 'PATROL':
-      return '巡逻'
-    case 'GATHER':
-      return '采集'
-    case 'BUILD':
-      return '建造'
-    case 'REPAIR':
-      return '维修'
-    case 'PRODUCE':
-      return '生产'
-    default:
-      return '空闲'
-  }
+  return commandName(type)
 }
 </script>
 
 <template>
   <section v-if="store.selectedUnit && unitDef" class="entity-card">
-    <h3>{{ unitDef.name }}</h3>
-    <p class="blurb">{{ unitDef.description }}</p>
+    <h3>{{ unitName(store.selectedUnit.typeId, unitDef.name) }}</h3>
+    <p class="blurb">{{ unitDesc(store.selectedUnit.typeId, unitDef.description) }}</p>
     <dl>
       <div>
-        <dt>生命</dt>
-        <dd>{{ store.selectedUnit.hp }} / {{ store.selectedUnit.maxHp }}</dd>
+        <dt>{{ t('inspect.hp') }}</dt>
+        <dd>{{ store.selectedUnit.hp }} / {{ store.selectedUnit.maxHp || unitDef.hp }}</dd>
       </div>
       <div>
-        <dt>移动</dt>
-        <dd>{{ store.selectedUnit.moveRemaining }} / {{ unitDef.moveRange }} 格</dd>
+        <dt>{{ t('inspect.move') }}</dt>
+        <dd>{{ t('inspect.moveCells', { cur: store.selectedUnit.moveRemaining, max: unitDef.moveRange }) }}</dd>
       </div>
       <div>
-        <dt>移速</dt>
-        <dd>{{ unitDef.moveMsPerCell }}ms / 格</dd>
+        <dt>{{ t('inspect.speed') }}</dt>
+        <dd>{{ t('inspect.speedVal', { ms: unitDef.moveMsPerCell }) }}</dd>
       </div>
       <div v-if="unitDef.attack > 0">
-        <dt>攻击</dt>
+        <dt>{{ t('inspect.attack') }}</dt>
         <dd>{{ unitDef.attack }}</dd>
       </div>
       <div v-if="unitDef.armor > 0 || unitDef.attack > 0">
-        <dt>护甲</dt>
+        <dt>{{ t('inspect.armor') }}</dt>
         <dd>{{ unitDef.armor }}</dd>
       </div>
       <div v-if="unitDef.attackRange > 0">
-        <dt>射程</dt>
+        <dt>{{ t('inspect.range') }}</dt>
         <dd>{{ unitDef.attackRange }}</dd>
       </div>
       <div v-if="unitDef.carryCapacity > 0">
-        <dt>携带</dt>
+        <dt>{{ t('inspect.carry') }}</dt>
         <dd>
           {{ store.selectedUnit.carry ? `${store.selectedUnit.carry.amount}/${unitDef.carryCapacity}` : `0 / ${unitDef.carryCapacity}` }}
         </dd>
       </div>
       <div>
-        <dt>指令</dt>
+        <dt>{{ t('inspect.command') }}</dt>
         <dd>{{ commandLabel(store.selectedUnit.command?.type) }}</dd>
       </div>
     </dl>
   </section>
   <section v-else-if="store.selectedBuilding && buildingDef" class="entity-card">
-    <h3>{{ buildingDef.name }}</h3>
-    <p class="blurb">{{ buildingDef.description }}</p>
+    <h3>{{ buildingName(store.selectedBuilding.typeId, buildingDef.name) }}</h3>
+    <p class="blurb">{{ buildingDesc(store.selectedBuilding.typeId, buildingDef.description) }}</p>
     <dl>
       <div>
-        <dt>生命</dt>
+        <dt>{{ t('inspect.hp') }}</dt>
         <dd>{{ store.selectedBuilding.hp }} / {{ store.selectedBuilding.maxHp }}</dd>
       </div>
       <div>
-        <dt>占地</dt>
+        <dt>{{ t('inspect.footprint') }}</dt>
         <dd>{{ buildingDef.size.w }} × {{ buildingDef.size.h }}</dd>
       </div>
       <div v-if="buildingDef.attack > 0">
-        <dt>攻击</dt>
+        <dt>{{ t('inspect.attack') }}</dt>
         <dd>{{ buildingDef.attack }}</dd>
       </div>
       <div v-if="buildingDef.attackRange > 0">
-        <dt>射程</dt>
+        <dt>{{ t('inspect.range') }}</dt>
         <dd>{{ buildingDef.attackRange }}</dd>
       </div>
       <div>
-        <dt>状态</dt>
-        <dd>{{ store.selectedBuilding.state === 'CONSTRUCTING' ? '建造中' : commandLabel(store.selectedBuilding.command?.type) }}</dd>
+        <dt>{{ t('inspect.state') }}</dt>
+        <dd>{{ store.selectedBuilding.state === 'CONSTRUCTING' ? t('inspect.building') : commandLabel(store.selectedBuilding.command?.type) }}</dd>
       </div>
       <div v-if="hasBuildCost">
-        <dt>造价</dt>
+        <dt>{{ t('inspect.cost') }}</dt>
         <dd>{{ formatResources(buildingDef.buildCost) }} · {{ formatDuration(buildingDef.buildTimeMs) }}</dd>
       </div>
       <div v-if="buildingDef.harvest">
-        <dt>产出</dt>
+        <dt>{{ t('inspect.output') }}</dt>
         <dd>
-          {{ buildingDef.harvest.resource === 'ore' ? '矿石' : buildingDef.harvest.resource === 'gold' ? '金' : '木材' }}
+          {{ resourceFull(buildingDef.harvest.resource) }}
           {{ buildingDef.harvest.amount }} / {{ formatDuration(buildingDef.harvest.intervalMs) }}
         </dd>
       </div>
       <div v-for="recipe in buildingDef.production" :key="recipe.unitTypeId">
-        <dt>生产</dt>
+        <dt>{{ t('inspect.produce') }}</dt>
         <dd>
-          {{ store.config?.units[recipe.unitTypeId]?.name ?? recipe.unitTypeId }}
+          {{ unitName(recipe.unitTypeId, store.config?.units[recipe.unitTypeId]?.name) }}
           · {{ formatResources(recipe.cost) }}
           · {{ formatDuration(recipe.timeMs) }}
         </dd>

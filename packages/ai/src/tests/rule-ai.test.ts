@@ -21,6 +21,17 @@ describe('规则 AI', () => {
     assert.equal(sim.getState().units['u0']?.hp, 71)
   })
 
+  it('开局不对地图另一侧出生团打火力覆盖', () => {
+    const sim = createSimulator()
+    sim.startMatch()
+    planOperation(sim, 'p1')
+    for (const unit of Object.values(sim.getState().units)) {
+      if (unit.ownerId === 'p0') {
+        assert.equal(unit.hp, unit.maxHp)
+      }
+    }
+  })
+
   it('工人会建造伐木场', () => {
     const sim = createSimulator({
       config: createTestMatchConfig({

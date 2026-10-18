@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { locale, localeModel, t } from '../i18n/index'
 import { useMatchStore, type AiDifficulty } from '../store/match'
 
 const store = useMatchStore()
@@ -6,28 +7,37 @@ const store = useMatchStore()
 function setDifficulty(value: string) {
   store.difficulty = value as AiDifficulty
 }
+
 </script>
 
 <template>
-  <main class="lobby">
-    <section class="panel">
-      <h1>战斗吧</h1>
-      <p>30 秒下令，然后观看 15 秒自走。本地 1 人 vs 规则 AI，色块战场。</p>
+  <main class="lobby" :data-locale="locale">
+    <section class="panel" :key="locale">
+      <h1>{{ t('game.title') }}</h1>
+      <p>{{ t('lobby.blurb') }}</p>
       <label>
-        地图
+        {{ t('lang.label') }}
+        <select v-model="localeModel">
+          <option value="zh-CN">{{ t('lang.zhCN') }}</option>
+          <option value="zh-TW">{{ t('lang.zhTW') }}</option>
+          <option value="en">{{ t('lang.en') }}</option>
+        </select>
+      </label>
+      <label>
+        {{ t('lobby.map') }}
         <select disabled>
-          <option>默认 50×50</option>
+          <option>{{ t('lobby.mapDefault') }}</option>
         </select>
       </label>
       <label>
-        AI 难度
+        {{ t('lobby.difficulty') }}
         <select :value="store.difficulty" @change="setDifficulty(($event.target as HTMLSelectElement).value)">
-          <option value="default">默认</option>
-          <option value="conservative">保守</option>
-          <option value="aggressive">积极</option>
+          <option value="default">{{ t('lobby.diffDefault') }}</option>
+          <option value="conservative">{{ t('lobby.diffConservative') }}</option>
+          <option value="aggressive">{{ t('lobby.diffAggressive') }}</option>
         </select>
       </label>
-      <button type="button" class="start" @click="store.startLocalMatch()">开始本地对局</button>
+      <button type="button" class="start" @click="store.startLocalMatch()">{{ t('lobby.start') }}</button>
     </section>
   </main>
 </template>

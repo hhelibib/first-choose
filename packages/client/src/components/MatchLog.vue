@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useMatchStore } from '../store/match'
+import { t } from '../i18n/index'
 import { currentOrders } from '../log/match-log'
 
 const store = useMatchStore()
@@ -59,27 +60,27 @@ function toneClass(tone: string): string {
 <template>
   <aside v-if="store.snapshot && store.player" class="match-log" :class="{ open }">
     <div v-show="open" class="body">
-    <h2>对局</h2>
+    <h2>{{ t('log.title') }}</h2>
     <dl class="facts">
       <div>
-        <dt>回合</dt>
-        <dd>{{ store.snapshot.round }} · {{ store.snapshot.phase === 'OPERATION' ? '操作' : store.snapshot.phase === 'AUTO' ? '自走' : store.snapshot.phase }}</dd>
+        <dt>{{ t('log.round') }}</dt>
+        <dd>{{ store.snapshot.round }} · {{ store.snapshot.phase === 'OPERATION' ? t('log.phaseOp') : store.snapshot.phase === 'AUTO' ? t('log.phaseAuto') : store.snapshot.phase }}</dd>
       </div>
       <div>
-        <dt>逻辑步</dt>
+        <dt>{{ t('log.tick') }}</dt>
         <dd>{{ store.snapshot.tick }}</dd>
       </div>
       <div>
-        <dt>我方</dt>
-        <dd>击杀 {{ store.player.stats.unitsKilled }} · 损失 {{ store.player.stats.unitsLost }} · 采集 {{ store.player.stats.resourcesGathered }}</dd>
+        <dt>{{ t('log.mine') }}</dt>
+        <dd>{{ t('log.kills', { k: store.player.stats.unitsKilled, l: store.player.stats.unitsLost, g: store.player.stats.resourcesGathered }) }}</dd>
       </div>
       <div v-if="enemy">
-        <dt>敌方</dt>
-        <dd>击杀 {{ enemy.stats.unitsKilled }} · 损失 {{ enemy.stats.unitsLost }}</dd>
+        <dt>{{ t('log.enemy') }}</dt>
+        <dd>{{ t('log.killsShort', { k: enemy.stats.unitsKilled, l: enemy.stats.unitsLost }) }}</dd>
       </div>
     </dl>
 
-    <h2>单位指令</h2>
+    <h2>{{ t('log.orders') }}</h2>
     <ul class="orders">
       <li
         v-for="row in orders"
@@ -93,19 +94,19 @@ function toneClass(tone: string): string {
     </ul>
 
     <div class="log-head">
-      <h2>战报</h2>
-      <button type="button" :class="{ on: !filterSelected }" @click="filterSelected = false">全部</button>
-      <button type="button" :disabled="!store.selected" :class="{ on: filterSelected }" @click="filterSelected = true">选中</button>
+      <h2>{{ t('log.report') }}</h2>
+      <button type="button" :class="{ on: !filterSelected }" @click="filterSelected = false">{{ t('log.all') }}</button>
+      <button type="button" :disabled="!store.selected" :class="{ on: filterSelected }" @click="filterSelected = true">{{ t('log.selected') }}</button>
     </div>
     <ul ref="listEl" class="entries">
       <li v-for="entry in visibleLog" :key="entry.id" :class="toneClass(entry.tone)">
         <span class="meta">R{{ entry.round }} · {{ entry.tick }}</span>
         {{ entry.text }}
       </li>
-      <li v-if="visibleLog.length === 0" class="empty">暂无记录</li>
+      <li v-if="visibleLog.length === 0" class="empty">{{ t('log.empty') }}</li>
     </ul>
     </div>
-    <button type="button" class="dock" @click="open = !open">{{ open ? '收起对局' : '对局' }}</button>
+    <button type="button" class="dock" @click="open = !open">{{ open ? t('log.close') : t('log.open') }}</button>
   </aside>
 </template>
 

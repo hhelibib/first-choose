@@ -1,14 +1,11 @@
 <script setup lang="ts">
-import { CARD_IDS } from '@battle/shared'
 import { useMatchStore } from '../store/match'
+import { cardName, t } from '../i18n/index'
 
 const store = useMatchStore()
 
 function nameOf(cardId: string): string {
-  if (cardId === CARD_IDS.emergencyRepair) return '紧急修缮'
-  if (cardId === CARD_IDS.artilleryBarrage) return '火力覆盖'
-  if (cardId === CARD_IDS.battleInspiration) return '战地鼓舞'
-  return cardId
+  return cardName(cardId, store.config?.cards[cardId]?.name)
 }
 
 function costOf(cardId: string): number {
@@ -27,21 +24,27 @@ function costOf(cardId: string): number {
       @click="store.beginCard(card.instanceId)"
     >
       {{ nameOf(card.cardId) }}
-      <span>{{ costOf(card.cardId) }} 能</span>
+      <span>{{ t('card.energy', { n: costOf(card.cardId) }) }}</span>
     </button>
-    <p>选中卡牌后再点目标。自走阶段不能出牌。</p>
+    <p>{{ t('card.hint') }}</p>
   </footer>
 </template>
 
 <style>
 .card-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 10px 12px;
-  background: #151b24;
+  background: rgb(15 22 30 / 88%);
   border-top: 1px solid #2c3644;
+  pointer-events: auto;
 }
 
 .card-bar button {

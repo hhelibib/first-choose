@@ -5,7 +5,7 @@ import type { CardTarget, Command, EntityRef, GameSnapshot, MatchConfig, PlayerI
 import { REJECT, type CommandResult } from '@battle/sim'
 import type { MatchListener, MatchRunner, StartMatchOptions } from './types.js'
 
-const REMOTE_DISABLED = '一期不实现联机对局'
+const REMOTE_DISABLED = 'reject.remote'
 
 export class RemoteMatchRunner implements MatchRunner {
   startMatch(_options?: StartMatchOptions): void {

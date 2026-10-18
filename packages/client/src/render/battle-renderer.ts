@@ -14,6 +14,7 @@ import {
   previewReachable,
   rangeCells,
 } from '../preview/command-preview.js'
+import { buildingName, t } from '../i18n/index.js'
 import { CELL, COLOR, ownerColor, setCellSize } from './colors.js'
 
 export interface RenderView {
@@ -25,6 +26,7 @@ export interface RenderView {
   events: DomainEvent[]
   snapshotAtMs: number
   isOperation: boolean
+  showOrderHints: boolean
 }
 
 const MAP_EDGE_PAD = 0
@@ -41,7 +43,8 @@ export class BattleRenderer {
   private readonly effects = new Graphics()
   private readonly overlay = new Graphics()
   private readonly labels = new Container()
-  private flashes: Array<{ x: number; y: number; until: number }> = []
+  private readonly floatLayer = new Container()
+  private hits: Array<{ gx: number; gy: number; until: number; label: Text }> = []
   private lastEvents: DomainEvent[] = []
   private zoom = 1
   private panX = 0
@@ -52,6 +55,7 @@ export class BattleRenderer {
   private mapRows = 1
   private viewW = 1
   private viewH = 1
+  private didFocusPlayer = false
 
   async mount(canvas: HTMLCanvasElement, parent: HTMLElement): Promise<void> {
     await this.app.init({
@@ -64,11 +68,29 @@ export class BattleRenderer {
     })
     const stage = this.app.stage
     stage.eventMode = 'static'
-    stage.addChild(this.terrain, this.occupancy, this.buildings, this.units, this.effects, this.overlay, this.labels)
+    stage.addChild(
+      this.terrain,
+      this.occupancy,
+      this.buildings,
+      this.units,
+      this.effects,
+      this.overlay,
+      this.labels,
+      this.floatLayer,
+    )
   }
 
   destroy(): void {
     this.app.destroy(true)
+  }
+
+  cellScreen(pos: GridPos, snapshot: GameSnapshot): { x: number; y: number; cell: number } {
+    this.layout(this.app.screen.width, this.app.screen.height, snapshot.map.width, snapshot.map.height)
+    return {
+      x: this.originX + this.panX + pos.x * CELL * this.zoom,
+      y: this.originY + this.panY + pos.y * CELL * this.zoom,
+      cell: CELL * this.zoom,
+    }
   }
 
   gridAt(clientX: number, clientY: number, snapshot: GameSnapshot): GridPos | null {
@@ -102,9 +124,7 @@ export class BattleRenderer {
 
   resetView(): void {
     this.zoom = 1
-    this.panX = 0
-    this.panY = 0
-    this.clampPan()
+    this.didFocusPlayer = false
   }
 
   zoomBy(factor: number): void {
@@ -139,6 +159,34 @@ export class BattleRenderer {
     this.clampPan()
   }
 
+  private focusPlayer(snapshot: GameSnapshot, playerId: string): void {
+    this.zoom = 1
+    let gx = 0
+    let gy = 0
+    let gw = 1
+    let gh = 1
+    const base = Object.values(snapshot.buildings).find(
+      (building) => building.ownerId === playerId && building.role === 'MAIN_BASE' && building.state !== 'DESTROYED',
+    )
+    if (base) {
+      gx = base.origin.x
+      gy = base.origin.y
+      gw = base.size.w
+      gh = base.size.h
+    } else {
+      const unit = Object.values(snapshot.units).find((item) => item.ownerId === playerId && item.state !== 'DEAD')
+      if (unit) {
+        gx = unit.pos.x
+        gy = unit.pos.y
+      }
+    }
+    const worldX = (gx + gw / 2) * CELL * this.zoom
+    const worldY = (gy + gh / 2) * CELL * this.zoom
+    this.panX = this.viewW / 2 - this.originX - worldX
+    this.panY = this.viewH / 2 - this.originY - worldY
+    this.clampPan()
+  }
+
   private clampPan(): void {
     const margin = MAX_OUTSIDE_CELLS * CELL * this.zoom
     this.panX = clampPanAxis(this.panX, this.originX, this.mapCols * CELL * this.zoom, this.viewW, margin)
@@ -152,30 +200,49 @@ export class BattleRenderer {
     view: RenderView,
   ): void {
     this.layout(this.app.screen.width, this.app.screen.height, snapshot.map.width, snapshot.map.height)
+    if (!this.didFocusPlayer) {
+      this.focusPlayer(snapshot, view.localPlayerId)
+      this.didFocusPlayer = true
+    }
     this.app.stage.position.set(this.originX + this.panX, this.originY + this.panY)
     this.app.stage.scale.set(this.zoom)
     this.app.stage.hitArea = new Rectangle(0, 0, snapshot.map.width * CELL, snapshot.map.height * CELL)
-    this.collectFlashes(view.events)
+    this.collectHits(snapshot, prev, view.events)
     this.drawTerrain(snapshot)
     this.drawOccupancy(snapshot)
     this.drawBuildings(snapshot, view)
     this.drawUnits(snapshot, prev, config, view)
-    this.drawEffects()
+    this.drawHits()
     this.drawOverlay(snapshot, config, view)
   }
 
-  private collectFlashes(events: DomainEvent[]): void {
+  private collectHits(snapshot: GameSnapshot, prev: GameSnapshot | null, events: DomainEvent[]): void {
     if (events === this.lastEvents) {
       return
     }
     this.lastEvents = events
     const now = performance.now()
     for (const event of events) {
-      if (event.type === 'DAMAGE_APPLIED' || event.type === 'UNIT_DIED' || event.type === 'CARD_PLAYED') {
-        this.flashes.push({ x: 0, y: 0, until: now + 280 })
+      if (event.type !== 'DAMAGE_APPLIED' && event.type !== 'UNIT_DIED') {
+        continue
       }
+      const id = event.type === 'DAMAGE_APPLIED' ? event.targetId : event.unitId
+      const unit = snapshot.units[id] ?? prev?.units[id]
+      const building = snapshot.buildings[id] ?? prev?.buildings[id]
+      const gx = unit?.pos.x ?? building?.origin.x
+      const gy = unit?.pos.y ?? building?.origin.y
+      if (gx === undefined || gy === undefined) {
+        continue
+      }
+      const amount = event.type === 'DAMAGE_APPLIED' ? event.amount : 0
+      const label = new Text({
+        text: amount > 0 ? `-${amount}` : t('map.dead'),
+        style: { fontSize: Math.max(11, Math.floor(CELL * 0.38)), fill: 0xffd0d0, fontFamily: 'Segoe UI, sans-serif', fontWeight: '700' },
+      })
+      label.anchor.set(0.5, 1)
+      this.floatLayer.addChild(label)
+      this.hits.push({ gx, gy, until: now + 900, label })
     }
-    this.flashes = this.flashes.filter((item) => item.until > now)
   }
 
   private drawTerrain(snapshot: GameSnapshot): void {
@@ -212,7 +279,7 @@ export class BattleRenderer {
     const g = this.buildings
     g.clear()
     for (const building of Object.values(snapshot.buildings)) {
-      drawBuilding(g, building, view.selected)
+      drawBuilding(g, building, view)
     }
     this.rebuildLabels(snapshot)
   }
@@ -229,25 +296,51 @@ export class BattleRenderer {
       const r = Math.max(5, Math.floor(CELL * 0.32))
       const cx = pos.x * CELL + CELL / 2
       const cy = pos.y * CELL + CELL / 2
-      if (selected) {
-        g.circle(cx, cy, r + 4).stroke({ color: COLOR.selected, width: 2 })
-      }
       g.circle(cx, cy, r).fill(color)
-      if (config.units[unit.typeId]?.role === 'WORKER') {
-        g.rect(cx - 4, cy - 4, 8, 8).fill(0xffffff)
+      if (
+        view.showOrderHints &&
+        view.isOperation &&
+        unit.ownerId === view.localPlayerId &&
+        unit.state !== 'DEAD'
+      ) {
+        g.circle(cx, cy, r + 3).stroke({
+          color: unit.command ? COLOR.orderSet : COLOR.orderIdle,
+          width: 2,
+        })
       }
-      drawHpBar(g, cx - 14, cy - 20, 28, unit.hp, unit.maxHp)
+      if (selected) {
+        g.circle(cx, cy, r + 5).stroke({ color: COLOR.selected, width: 2 })
+      }
+      if (config.units[unit.typeId]?.role === 'WORKER') {
+        const mark = Math.max(4, Math.floor(CELL * 0.22))
+        g.rect(cx - mark / 2, cy - mark / 2, mark, mark).fill(0xffffff)
+      }
+      const maxHp = unit.maxHp > 0 ? unit.maxHp : (config.units[unit.typeId]?.hp ?? 1)
+      if (unit.hp < maxHp) {
+        const barW = Math.max(8, r * 2)
+        drawHpBar(g, cx - barW / 2, cy + r + 2, barW, unit.hp, maxHp)
+      }
     }
   }
 
-  private drawEffects(): void {
+  private drawHits(): void {
     const g = this.effects
     g.clear()
     const now = performance.now()
-    this.flashes = this.flashes.filter((item) => item.until > now)
-    if (this.flashes.length > 0) {
-      g.rect(0, 0, this.app.screen.width, 4).fill({ color: COLOR.hpBad, alpha: 0.45 })
+    const keep: typeof this.hits = []
+    for (const hit of this.hits) {
+      if (hit.until <= now) {
+        hit.label.destroy()
+        continue
+      }
+      const t = (hit.until - now) / 900
+      g.rect(hit.gx * CELL, hit.gy * CELL, CELL - 1, CELL - 1).fill({ color: COLOR.hpBad, alpha: 0.22 * t })
+      hit.label.x = hit.gx * CELL + CELL / 2
+      hit.label.y = hit.gy * CELL + CELL * 0.2 - (1 - t) * CELL * 0.8
+      hit.label.alpha = Math.min(1, t * 1.4)
+      keep.push(hit)
     }
+    this.hits = keep
   }
 
   private drawOverlay(snapshot: GameSnapshot, config: MatchConfig, view: RenderView): void {
@@ -330,7 +423,7 @@ export class BattleRenderer {
         continue
       }
       const text = new Text({
-        text: `${node.resource === 'ore' ? '矿' : '木'}${node.remaining}`,
+        text: `${t(node.resource === 'ore' ? 'map.ore' : 'map.wood')}${node.remaining}`,
         style: { fontSize: 10, fill: 0xf7efe3, fontFamily: 'Segoe UI, sans-serif' },
       })
       text.x = node.pos.x * CELL + 4
@@ -374,40 +467,40 @@ function progressPos(unit: Unit, config: MatchConfig): { x: number; y: number } 
   }
 }
 
-function drawBuilding(g: Graphics, building: Building, selected: EntityRef | null): void {
+function drawBuilding(g: Graphics, building: Building, view: RenderView): void {
   const w = building.size.w * CELL - 2
   const h = building.size.h * CELL - 2
   const x = building.origin.x * CELL + 1
   const y = building.origin.y * CELL + 1
   const fill = building.state === 'CONSTRUCTING' ? COLOR.constructing : ownerColor(building.ownerId, true)
   g.rect(x, y, w, h).fill(fill)
-  if (selected?.kind === 'building' && selected.id === building.id) {
-    g.rect(x, y, w, h).stroke({ color: COLOR.selected, width: 2 })
+  if (
+    view.showOrderHints &&
+    view.isOperation &&
+    building.ownerId === view.localPlayerId &&
+    building.state !== 'DESTROYED'
+  ) {
+    g.rect(x, y, w, h).stroke({
+      color: building.command ? COLOR.orderSet : COLOR.orderIdle,
+      width: 2,
+    })
   }
-  drawHpBar(g, x + 4, y + h - 8, w - 8, building.hp, building.maxHp)
+  if (view.selected?.kind === 'building' && view.selected.id === building.id) {
+    g.rect(x - 1, y - 1, w + 2, h + 2).stroke({ color: COLOR.selected, width: 2 })
+  }
+  drawHpBar(g, x + 4, y + h - 8, Math.max(8, w - 8), building.hp, building.maxHp > 0 ? building.maxHp : 1)
 }
 
 function drawHpBar(g: Graphics, x: number, y: number, w: number, hp: number, maxHp: number): void {
   const ratio = maxHp <= 0 ? 0 : Math.max(0, Math.min(1, hp / maxHp))
-  g.rect(x, y, w, 4).fill(COLOR.hpBack)
-  g.rect(x, y, w * ratio, 4).fill(ratio > 0.35 ? COLOR.hpGood : COLOR.hpBad)
+  const filled = Math.max(0, Math.round(w * ratio))
+  g.rect(x, y, w, 4).fill({ color: COLOR.hpBack })
+  if (filled > 0) {
+    g.rect(x, y, filled, 4).fill({ color: ratio > 0.35 ? COLOR.hpGood : COLOR.hpBad })
+  }
 }
 
 function buildingLabel(building: Building): string {
-  if (building.role === 'MAIN_BASE') {
-    return '主基地'
-  }
-  if (building.role === 'PRODUCTION') {
-    return building.state === 'CONSTRUCTING' ? '兵营…' : '兵营'
-  }
-  if (building.role === 'DEFENSE') {
-    return building.state === 'CONSTRUCTING' ? '箭塔…' : '箭塔'
-  }
-  if (building.typeId === 'lumber-camp') {
-    return building.state === 'CONSTRUCTING' ? '伐木…' : '伐木场'
-  }
-  if (building.typeId === 'ore-camp') {
-    return building.state === 'CONSTRUCTING' ? '采矿…' : '采矿场'
-  }
-  return building.typeId
+  const name = buildingName(building.typeId)
+  return building.state === 'CONSTRUCTING' ? `${name}${t('building.ellipsis')}` : name
 }

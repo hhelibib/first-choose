@@ -2,11 +2,45 @@
 import { computed, ref } from 'vue'
 import type { ResourceType, Resources } from '@battle/shared'
 import { BUILDING_TYPE_IDS, useMatchStore } from '../store/match'
-import { canAfford, formatDuration, formatResources, resourceLabel } from '../format/resources'
-import EntityCard from './EntityCard.vue'
+import { canAfford, formatDuration, formatResources, resourceFull } from '../format/resources'
+import { buildingName, t, unitName as localizedUnit } from '../i18n/index'
 
 const store = useMatchStore()
-const open = ref(false)
+const panelEl = ref<HTMLElement | null>(null)
+
+const floating = computed(() => !!store.selected && !!store.commandAnchor)
+
+const floatStyle = computed(() => {
+  const anchor = store.commandAnchor
+  if (!floating.value || !anchor) {
+    return {}
+  }
+  const parent = panelEl.value?.parentElement
+  const viewW = parent?.clientWidth ?? 1280
+  const viewH = parent?.clientHeight ?? 720
+  const panelW = 320
+  const panelH = Math.min(280, viewH - 24)
+  const gap = Math.max(8, Math.round(anchor.w * 0.2))
+  let left = anchor.x + anchor.w + gap
+  let top = anchor.y
+  if (left + panelW > viewW - 8) {
+    left = anchor.x - gap - panelW
+  }
+  if (left < 8) {
+    left = 8
+  }
+  if (top + panelH > viewH - 8) {
+    top = Math.max(8, viewH - 8 - panelH)
+  }
+  if (top < 8) {
+    top = 8
+  }
+  return {
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+    maxHeight: `${Math.round(panelH)}px`,
+  }
+})
 
 const commands = computed(() => store.config?.units[store.selectedUnit?.typeId ?? '']?.commands ?? [])
 const recipes = computed(() => store.config?.buildings[store.selectedBuilding?.typeId ?? '']?.production ?? [])
@@ -23,20 +57,24 @@ const placing = computed(() => (store.mode === 'build' && store.buildTypeId ? st
 const repair = computed(() => store.config?.repair ?? null)
 
 function unitName(typeId: string): string {
-  return store.config?.units[typeId]?.name ?? typeId
+  return localizedUnit(typeId, store.config?.units[typeId]?.name)
 }
 
 function harvestName(type: ResourceType): string {
-  return resourceLabel(type)
+  return resourceFull(type)
 }
 
 function recipeHint(typeId: string, cost: Resources, timeMs: number): string {
   const pop = store.config?.units[typeId]?.population ?? 0
   const parts = [formatResources(cost), formatDuration(timeMs)]
   if (pop > 0) {
-    parts.push(`人口 ${pop}`)
+    parts.push(t('order.pop', { n: pop }))
   }
   return parts.join(' · ')
+}
+
+function bName(typeId: string, fallback?: string): string {
+  return buildingName(typeId, fallback)
 }
 
 function buildHint(cost: Resources, timeMs: number): string {
@@ -49,52 +87,52 @@ function shortOn(cost: Resources): boolean {
 </script>
 
 <template>
-  <aside class="command-panel" :class="{ open }">
-    <div v-show="open" class="body">
-    <h2>资料</h2>
-    <p v-if="!store.selected" class="hint">单击己方单位或建筑。右键地面移动，右键敌人攻击。资源靠对应建筑自动产出。</p>
-    <EntityCard />
-    <h2 v-if="store.selected">指令</h2>
-    <p v-if="placing" class="hint">
-      点击空地放置{{ placing.name }}（{{ buildHint(placing.buildCost, placing.buildTimeMs) }}）。资源在工人开始建造时扣除。
-      <template v-if="placing.harvest">建成后该工人并入建筑，之后自动产出{{ harvestName(placing.harvest.resource) }}。</template>
-    </p>
-    <p v-else-if="store.mode === 'repair' && repair" class="hint">点击己方建筑维修：每 {{ formatDuration(repair.intervalMs) }}消耗矿 {{ repair.oreCost }}，回复 {{ repair.heal }} 生命。</p>
-    <template v-if="store.selectedUnit">
+  <aside v-if="floating" ref="panelEl" class="command-panel" :style="floatStyle">
+    <div v-if="store.isTargeting" class="order-hint">
+      <p>{{ t('order.confirm') }}</p>
+      <p v-if="placing" class="hint">
+        {{ t('order.place', { name: bName(store.buildTypeId ?? '', placing.name), hint: buildHint(placing.buildCost, placing.buildTimeMs) }) }}
+        <template v-if="placing.harvest">{{ t('order.harvest', { res: harvestName(placing.harvest.resource) }) }}</template>
+      </p>
+      <p v-else-if="store.mode === 'repair' && repair" class="hint">{{ t('order.repair') }}</p>
+      <p v-else-if="store.mode === 'patrol'" class="hint">{{ t('order.patrol') }}</p>
+    </div>
+    <template v-else>
+    <div v-if="store.selectedUnit" class="actions">
       <button v-if="commands.includes('BUILD') && farm" type="button" :disabled="!canAct" :class="{ short: shortOn(farm.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.farm)">
-        <span>建造粮田</span>
-        <small>{{ buildHint(farm.buildCost, farm.buildTimeMs) }} · 消耗工人</small>
+        <span>{{ t('building.farm.name') }}</span>
+        <small>{{ buildHint(farm.buildCost, farm.buildTimeMs) }}</small>
       </button>
       <button v-if="commands.includes('BUILD') && lumberCamp" type="button" :disabled="!canAct" :class="{ short: shortOn(lumberCamp.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.lumberCamp)">
-        <span>建造伐木场</span>
-        <small>{{ buildHint(lumberCamp.buildCost, lumberCamp.buildTimeMs) }} · 消耗工人</small>
+        <span>{{ t('building.lumber-camp.name') }}</span>
+        <small>{{ buildHint(lumberCamp.buildCost, lumberCamp.buildTimeMs) }}</small>
       </button>
       <button v-if="commands.includes('BUILD') && quarry" type="button" :disabled="!canAct" :class="{ short: shortOn(quarry.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.quarry)">
-        <span>建造采石场</span>
-        <small>{{ buildHint(quarry.buildCost, quarry.buildTimeMs) }} · 消耗工人</small>
+        <span>{{ t('building.quarry.name') }}</span>
+        <small>{{ buildHint(quarry.buildCost, quarry.buildTimeMs) }}</small>
       </button>
       <button v-if="commands.includes('BUILD') && oreCamp" type="button" :disabled="!canAct" :class="{ short: shortOn(oreCamp.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.oreCamp)">
-        <span>建造采矿场</span>
-        <small>{{ buildHint(oreCamp.buildCost, oreCamp.buildTimeMs) }} · 消耗工人</small>
+        <span>{{ t('building.ore-camp.name') }}</span>
+        <small>{{ buildHint(oreCamp.buildCost, oreCamp.buildTimeMs) }}</small>
       </button>
       <button v-if="commands.includes('BUILD') && goldCamp" type="button" :disabled="!canAct" :class="{ short: shortOn(goldCamp.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.goldCamp)">
-        <span>建造金矿</span>
-        <small>{{ buildHint(goldCamp.buildCost, goldCamp.buildTimeMs) }} · 消耗工人</small>
+        <span>{{ t('building.gold-camp.name') }}</span>
+        <small>{{ buildHint(goldCamp.buildCost, goldCamp.buildTimeMs) }}</small>
       </button>
       <button v-if="commands.includes('BUILD') && barracks" type="button" :disabled="!canAct" :class="{ short: shortOn(barracks.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.barracks)">
-        <span>建造兵营</span>
+        <span>{{ t('building.barracks.name') }}</span>
         <small>{{ buildHint(barracks.buildCost, barracks.buildTimeMs) }}</small>
       </button>
       <button v-if="commands.includes('BUILD') && arrowTower" type="button" :disabled="!canAct" :class="{ short: shortOn(arrowTower.buildCost) }" @click="store.beginBuild(BUILDING_TYPE_IDS.arrowTower)">
-        <span>建造箭塔</span>
+        <span>{{ t('building.arrow-tower.name') }}</span>
         <small>{{ buildHint(arrowTower.buildCost, arrowTower.buildTimeMs) }}</small>
       </button>
-      <button v-if="commands.includes('PATROL')" type="button" :disabled="!canAct" @click="store.beginPatrol()">巡逻（点两格）</button>
-      <button v-if="commands.includes('REPAIR')" type="button" :disabled="!canAct" @click="store.beginRepair()">维修建筑</button>
-      <button type="button" :disabled="!canAct" @click="store.sendClear()">停止</button>
-    </template>
-    <template v-else-if="store.selectedBuilding">
-      <p v-if="recipes.length === 0" class="hint">这座建筑不生产单位。</p>
+      <button v-if="commands.includes('PATROL')" type="button" :disabled="!canAct" @click="store.beginPatrol()">{{ t('cmd.PATROL') }}</button>
+      <button v-if="commands.includes('REPAIR')" type="button" :disabled="!canAct" @click="store.beginRepair()">{{ t('cmd.REPAIR') }}</button>
+      <button type="button" :disabled="!canAct" @click="store.sendClear()">{{ t('order.stop') }}</button>
+    </div>
+    <div v-else-if="store.selectedBuilding" class="actions">
+      <p v-if="recipes.length === 0" class="hint full">{{ t('order.noProd') }}</p>
       <button
         v-for="recipe in recipes"
         :key="recipe.unitTypeId"
@@ -103,98 +141,77 @@ function shortOn(cost: Resources): boolean {
         :class="{ short: shortOn(recipe.cost) }"
         @click="store.produce(recipe.unitTypeId)"
       >
-        <span>生产{{ unitName(recipe.unitTypeId) }}</span>
+        <span>{{ t('order.produce', { name: unitName(recipe.unitTypeId) }) }}</span>
         <small>{{ recipeHint(recipe.unitTypeId, recipe.cost, recipe.timeMs) }}</small>
       </button>
-      <button v-if="recipes.length > 0" type="button" :disabled="!canAct" @click="store.sendClear()">停止生产</button>
-    </template>
+      <button v-if="recipes.length > 0" type="button" :disabled="!canAct" @click="store.sendClear()">{{ t('order.stop') }}</button>
     </div>
-    <button type="button" class="dock" @click="open = !open">{{ open ? '收起资料' : '资料' }}</button>
+    </template>
   </aside>
 </template>
 
 <style>
 .command-panel {
   position: absolute;
-  top: 50%;
-  right: 0;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
-.command-panel.open {
-  top: 16px;
-  bottom: 16px;
-  transform: none;
-  align-items: stretch;
-  max-height: calc(100% - 32px);
-}
-
-.command-panel.open .dock {
-  border-radius: 10px 0 0 10px;
-}
-
-.command-panel .dock {
-  pointer-events: auto;
-  align-self: center;
-  flex: none;
-  writing-mode: vertical-rl;
-  letter-spacing: 0.12em;
-  padding: 14px 7px;
-  border: 1px solid #4aa3ff;
-  border-right: none;
-  border-radius: 10px 0 0 10px;
-  background: rgb(15 22 30 / 62%);
-  color: #e8edf2;
-}
-
-.command-panel .body {
-  pointer-events: auto;
-  width: 260px;
-  padding: 12px;
-  background: rgb(15 22 30 / 42%);
-  backdrop-filter: blur(8px);
-  border: 1px solid #2c3644;
-  border-right: none;
-  border-radius: 10px 0 0 10px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  overflow: auto;
-}
-
-.command-panel h2 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.command-panel .hint,
-.command-panel p {
-  margin: 0;
-  color: #b7c2ce;
-  font-size: 13px;
-}
-
-.command-panel .body button {
+  z-index: 6;
+  width: 320px;
   padding: 8px;
+  background: rgb(15 22 30 / 82%);
+  border: 1px solid #2c3644;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  pointer-events: auto;
+}
+
+.command-panel .order-hint {
+  display: grid;
+  gap: 6px;
+}
+
+.command-panel .order-hint > p:first-child {
+  margin: 0;
+  color: #f2f6fa;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.command-panel .hint {
+  margin: 0 0 6px;
+  color: #b7c2ce;
+  font-size: 12px;
+}
+
+.command-panel .hint.full {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.command-panel .actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.command-panel .actions button {
+  min-width: 0;
+  padding: 6px 8px;
   border: 1px solid #3d4b5c;
-  background: rgb(29 38 50 / 72%);
+  background: rgb(29 38 50 / 80%);
   color: #e8edf2;
   text-align: left;
   display: grid;
   gap: 2px;
 }
 
-.command-panel .body button small {
+.command-panel .actions button small {
   color: #9aabbc;
-  font-size: 12px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.command-panel .body button.short small {
+.command-panel .actions button.short small {
   color: #f0a3a3;
 }
 </style>

@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { locale, t } from '../i18n/index'
 import { useMatchStore } from '../store/match'
 import { BattleRenderer } from '../render/battle-renderer'
 import HudBar from '../components/HudBar.vue'
 import CommandPanel from '../components/CommandPanel.vue'
+import InspectorPanel from '../components/InspectorPanel.vue'
 import MatchLog from '../components/MatchLog.vue'
+import CardBar from '../components/CardBar.vue'
 
 const store = useMatchStore()
 const { snapshot, prevSnapshot, config } = storeToRefs(store)
+const combatFeed = computed(() => store.logEntries.filter((entry) => entry.tone === 'combat').slice(-4))
 const stageEl = ref<HTMLElement | null>(null)
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 let renderer: BattleRenderer | null = null
@@ -54,7 +58,48 @@ function renderFrame(): void {
     events: store.events,
     snapshotAtMs: store.snapshotAtMs,
     isOperation: store.isOperation,
+    showOrderHints: store.showOrderHints,
   })
+  syncCommandAnchor()
+}
+
+function syncCommandAnchor(): void {
+  const view = renderer
+  if (!view || !snapshot.value || !store.selected) {
+    if (store.commandAnchor) {
+      store.commandAnchor = null
+    }
+    return
+  }
+  let origin = { x: 0, y: 0 }
+  let size = { w: 1, h: 1 }
+  if (store.selected.kind === 'unit') {
+    const unit = snapshot.value.units[store.selected.id]
+    if (!unit) {
+      store.commandAnchor = null
+      return
+    }
+    origin = unit.pos
+  } else {
+    const building = snapshot.value.buildings[store.selected.id]
+    if (!building) {
+      store.commandAnchor = null
+      return
+    }
+    origin = building.origin
+    size = building.size
+  }
+  const point = view.cellScreen(origin, snapshot.value)
+  const next = {
+    x: point.x,
+    y: point.y,
+    w: point.cell * size.w,
+    h: point.cell * size.h,
+  }
+  const prev = store.commandAnchor
+  if (!prev || Math.abs(prev.x - next.x) > 0.5 || Math.abs(prev.y - next.y) > 0.5 || prev.w !== next.w || prev.h !== next.h) {
+    store.commandAnchor = next
+  }
 }
 
 function onPointerMove(event: PointerEvent): void {
@@ -83,7 +128,11 @@ function applyClick(event: PointerEvent): void {
   }
   const pos = renderer.gridAt(event.clientX, event.clientY, snapshot.value)
   if (!pos) {
-    if (event.button === 0) {
+    if (event.button === 2 && store.isTargeting) {
+      store.cancelTargeting()
+      return
+    }
+    if (event.button === 0 && !store.isTargeting) {
       store.selected = null
       store.resetInteraction()
     }
@@ -145,21 +194,21 @@ function resetView(): void {
   renderer?.resetView()
 }
 
-const winnerText = () => {
+const winnerText = computed(() => {
   if (!store.winnerCondition) {
     return ''
   }
   if (store.winnerCondition === 'MUTUAL_DESTRUCTION') {
-    return '双方主基地同时被摧毁，没有胜者'
+    return t('game.draw')
   }
   if (store.winnerId === store.localPlayerId) {
-    return '胜利：摧毁对方主基地'
+    return t('game.win')
   }
   if (store.winnerId) {
-    return '失败：主基地被摧毁'
+    return t('game.lose')
   }
   return store.winnerCondition
-}
+})
 </script>
 
 <template>
@@ -178,17 +227,22 @@ const winnerText = () => {
       <div class="zoom-tools">
         <button type="button" @click="zoomIn">+</button>
         <button type="button" @click="zoomOut">−</button>
-        <button type="button" @click="resetView">复位</button>
+        <button type="button" @click="resetView">{{ t('game.reset') }}</button>
       </div>
-      <HudBar />
-      <MatchLog />
-      <CommandPanel />
-      <div v-if="store.paused" class="paused-note">已暂停</div>
+      <HudBar :key="locale" />
+      <InspectorPanel :key="locale" />
+      <MatchLog :key="locale" />
+      <CommandPanel :key="locale" />
+      <CardBar :key="locale" />
+      <ul v-if="combatFeed.length" class="combat-feed">
+        <li v-for="line in combatFeed" :key="line.id">{{ line.text }}</li>
+      </ul>
+      <div v-if="store.paused" class="paused-note">{{ t('hud.paused') }}</div>
       <div v-if="store.snapshot?.phase === 'GAME_OVER'" class="over">
         <div>
-          <h2>对局结束</h2>
-          <p>{{ winnerText() }}</p>
-          <button type="button" @click="store.backToLobby()">返回大厅</button>
+          <h2>{{ t('game.over') }}</h2>
+          <p>{{ winnerText }}</p>
+          <button type="button" @click="store.backToLobby()">{{ t('hud.lobby') }}</button>
         </div>
       </div>
     </div>
@@ -221,6 +275,25 @@ canvas {
 
 canvas:active {
   cursor: grabbing;
+}
+
+.combat-feed {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  z-index: 6;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+  width: min(420px, calc(100% - 180px));
+  background: rgb(15 22 30 / 72%);
+  border: 1px solid #2c3644;
+  border-radius: 8px;
+  pointer-events: none;
+  color: #f0c4c4;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .zoom-tools {

@@ -68,6 +68,11 @@ describe('阶段机', () => {
     assert.equal(sim.getState().map.width, 50)
     assert.equal(sim.getState().map.height, 50)
     assert.equal(Object.keys(sim.getState().units).length, 6)
-    assert.equal(Object.keys(sim.getState().buildings).length, 2)
+    assert.equal(Object.keys(sim.getState().buildings).length, 8)
+    for (const unit of Object.values(sim.getState().units)) {
+      const maxHp = sim.getState().config.units[unit.typeId]?.hp ?? 0
+      assert.equal(unit.maxHp, maxHp)
+      assert.equal(unit.hp, maxHp)
+    }
   })
 })

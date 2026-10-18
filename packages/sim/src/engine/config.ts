@@ -250,17 +250,6 @@ function makeTerrain(width: number, height: number, blocked: GridPos[]): Terrain
   )
 }
 
-const DEFAULT_BLOCKED: GridPos[] = [
-  { x: 12, y: 24 },
-  { x: 13, y: 24 },
-  { x: 14, y: 24 },
-  { x: 15, y: 24 },
-  { x: 34, y: 25 },
-  { x: 35, y: 25 },
-  { x: 36, y: 25 },
-  { x: 37, y: 25 },
-]
-
 export function createDefaultMatchConfig(): MatchConfig {
   return parseMatchConfig({
     id: 'default-50x50',
@@ -268,13 +257,18 @@ export function createDefaultMatchConfig(): MatchConfig {
       id: 'default-50x50',
       width: DEFAULT_MAP_WIDTH,
       height: DEFAULT_MAP_HEIGHT,
-      terrain: makeTerrain(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, DEFAULT_BLOCKED),
+      terrain: makeTerrain(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, []),
       resourceNodes: [],
       players: [
         {
           start: { x: 2, y: 2 },
           teamId: 0,
-          buildings: [{ typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 2, y: 2 } }],
+          buildings: [
+            { typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 2, y: 2 } },
+            { typeId: BUILDING_TYPE_IDS.farm, origin: { x: 4, y: 2 } },
+            { typeId: BUILDING_TYPE_IDS.lumberCamp, origin: { x: 4, y: 3 } },
+            { typeId: BUILDING_TYPE_IDS.quarry, origin: { x: 2, y: 4 } },
+          ],
           units: [
             { typeId: UNIT_TYPE_IDS.worker, pos: { x: 1, y: 2 } },
             { typeId: UNIT_TYPE_IDS.worker, pos: { x: 2, y: 1 } },
@@ -284,7 +278,12 @@ export function createDefaultMatchConfig(): MatchConfig {
         {
           start: { x: 46, y: 46 },
           teamId: 1,
-          buildings: [{ typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 46, y: 46 } }],
+          buildings: [
+            { typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 46, y: 46 } },
+            { typeId: BUILDING_TYPE_IDS.farm, origin: { x: 44, y: 46 } },
+            { typeId: BUILDING_TYPE_IDS.lumberCamp, origin: { x: 44, y: 45 } },
+            { typeId: BUILDING_TYPE_IDS.quarry, origin: { x: 46, y: 44 } },
+          ],
           units: [
             { typeId: UNIT_TYPE_IDS.worker, pos: { x: 45, y: 46 } },
             { typeId: UNIT_TYPE_IDS.worker, pos: { x: 46, y: 45 } },

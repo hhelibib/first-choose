@@ -212,7 +212,12 @@ export function planOperation(sim: Simulator, playerId: string, options: RuleAIO
 function findClusterCell(state: GameState, playerId: string): GridPos | null {
   let best: { pos: GridPos; count: number } | null = null
   const enemies = Object.values(state.units).filter((unit) => unit.ownerId !== playerId && unit.state !== 'DEAD')
+  const allies = Object.values(state.units).filter((unit) => unit.ownerId === playerId && unit.state !== 'DEAD')
   for (const unit of enemies) {
+    const nearby = allies.some((ally) => chebyshev(ally.pos, unit.pos) <= 10)
+    if (!nearby) {
+      continue
+    }
     const count = enemies.filter((other) => chebyshev(other.pos, unit.pos) <= 1).length
     if (count >= 2 && (!best || count > best.count || (count === best.count && unit.id < `${best.pos.x},${best.pos.y}`))) {
       best = { pos: { ...unit.pos }, count }
