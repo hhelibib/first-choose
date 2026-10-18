@@ -5,6 +5,7 @@ import { currentOrders } from '../log/match-log'
 
 const store = useMatchStore()
 const filterSelected = ref(false)
+const open = ref(false)
 const listEl = ref<HTMLElement | null>(null)
 
 const orders = computed(() => {
@@ -56,7 +57,8 @@ function toneClass(tone: string): string {
 </script>
 
 <template>
-  <aside v-if="store.snapshot && store.player" class="match-log">
+  <aside v-if="store.snapshot && store.player" class="match-log" :class="{ open }">
+    <div v-show="open" class="body">
     <h2>对局</h2>
     <dl class="facts">
       <div>
@@ -102,20 +104,68 @@ function toneClass(tone: string): string {
       </li>
       <li v-if="visibleLog.length === 0" class="empty">暂无记录</li>
     </ul>
+    </div>
+    <button type="button" class="dock" @click="open = !open">{{ open ? '收起对局' : '对局' }}</button>
   </aside>
 </template>
 
 <style>
 .match-log {
-  width: 260px;
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.match-log.open {
+  top: 16px;
+  bottom: 16px;
+  transform: none;
+  align-items: stretch;
+  max-height: calc(100% - 32px);
+}
+
+.match-log.open .dock {
+  border-radius: 0 10px 10px 0;
+}
+
+.match-log .dock {
+  pointer-events: auto;
+  align-self: center;
+  flex: none;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.12em;
+  padding: 14px 7px;
+  border: 1px solid #4aa3ff;
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  background: rgb(15 22 30 / 62%);
+  color: #e8edf2;
+}
+
+.match-log .body {
+  pointer-events: auto;
+  width: 240px;
   padding: 12px;
-  background: #151b24;
-  border-right: 1px solid #2c3644;
+  background: rgb(15 22 30 / 42%);
+  backdrop-filter: blur(8px);
+  border: 1px solid #2c3644;
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
   display: grid;
   grid-template-rows: auto auto auto auto auto 1fr;
   gap: 8px;
   min-height: 0;
   overflow: hidden;
+}
+
+.match-log.open {
+  left: 0;
 }
 
 .match-log h2 {

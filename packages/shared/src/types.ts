@@ -129,7 +129,7 @@ export interface Unit {
   attackTarget: EntityRef | null
 }
 
-export type BuildingRole = 'MAIN_BASE' | 'PRODUCTION' | 'DEFENSE' | 'WAREHOUSE'
+export type BuildingRole = 'MAIN_BASE' | 'PRODUCTION' | 'DEFENSE' | 'WAREHOUSE' | 'RESOURCE'
 export type BuildingState = 'CONSTRUCTING' | 'ACTIVE' | 'DESTROYED'
 
 export interface Building {
@@ -147,6 +147,7 @@ export interface Building {
   cooldownMs: number
   builderId: UnitId | null
   productionRemainingMs: number
+  harvestProgressMs: number
 }
 
 export interface ResourceNodeConfig {
@@ -264,6 +265,8 @@ export interface BuildingDefinition {
   buildCost: Resources
   buildTimeMs: number
   production: ProductionRecipe[]
+  /** 资源建筑完工后自动产出；建造完成会消耗工人。 */
+  harvest?: { resource: ResourceType; amount: number; intervalMs: number }
 }
 
 export interface RepairConfig {
@@ -349,4 +352,5 @@ export type DomainEvent =
   | { type: 'BUILDING_PLACED'; buildingId: string }
   | { type: 'PRODUCTION_COMPLETED'; buildingId: string; unitId: string }
   | { type: 'CARD_PLAYED'; playerId: string; cardId: string }
+  | { type: 'WORKER_CONSUMED'; unitId: string; buildingId: string }
   | { type: 'VICTORY'; winnerId: string | null; condition: string }

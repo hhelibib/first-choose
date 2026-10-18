@@ -20,9 +20,12 @@ export interface StartMatchOptions {
 export interface PhaseInfo {
   phase: GamePhase
   round: number
-  /** 操作阶段结束的墙钟。自走阶段为 null。 */
+  /** 操作阶段结束的墙钟。暂停或自走阶段为 null。 */
   operationEndsAtMs: number | null
+  /** 操作阶段剩余毫秒。暂停时由 Runner 冻结。 */
+  operationRemainMs: number | null
   phaseTicksRemaining: number
+  paused: boolean
 }
 
 export interface MatchListener {
@@ -42,6 +45,7 @@ export interface MatchRunner {
   clearCommand(playerId: PlayerId, target: EntityRef): CommandResult
   playCard(playerId: PlayerId, instanceId: string, target?: CardTarget): CommandResult
   endOperation(): void
+  setPaused(paused: boolean): void
   subscribe(listener: MatchListener): () => void
   getSnapshot(): GameSnapshot | null
   getConfig(): MatchConfig | null

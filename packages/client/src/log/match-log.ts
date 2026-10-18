@@ -171,6 +171,15 @@ export function linesFromEvents(
       })
       continue
     }
+    if (event.type === 'WORKER_CONSUMED') {
+      lines.push({
+        ...base,
+        text: `${entityLabel(snapshot, config, event.unitId, localPlayerId)} 并入 ${entityLabel(snapshot, config, event.buildingId, localPlayerId)}`,
+        relatedIds: [event.unitId, event.buildingId],
+        tone: 'econ',
+      })
+      continue
+    }
     if (event.type === 'CARD_PLAYED') {
       const who = event.playerId === localPlayerId ? '我方' : '敌方'
       const card = config.cards[event.cardId]?.name ?? event.cardId

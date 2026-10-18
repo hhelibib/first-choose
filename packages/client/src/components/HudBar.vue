@@ -26,8 +26,13 @@ const phaseText = computed(() => {
 })
 
 const countdown = computed(() => {
-  if (store.snapshot?.phase === 'OPERATION' && store.phaseInfo?.operationEndsAtMs) {
-    return `${Math.ceil(Math.max(0, store.phaseInfo.operationEndsAtMs - now.value) / 1000)}s`
+  if (store.snapshot?.phase === 'OPERATION') {
+    const remain = store.paused
+      ? (store.phaseInfo?.operationRemainMs ?? 0)
+      : store.phaseInfo?.operationEndsAtMs
+        ? Math.max(0, store.phaseInfo.operationEndsAtMs - now.value)
+        : (store.phaseInfo?.operationRemainMs ?? 0)
+    return `${Math.ceil(remain / 1000)}s`
   }
   if (store.snapshot?.phase === 'AUTO') {
     const remain = store.snapshot.phaseTicksRemaining * TICK_MS
@@ -47,22 +52,30 @@ const countdown = computed(() => {
     <div>金 {{ store.player.resources.gold }}</div>
     <div>能量 {{ store.player.energy }}/{{ store.player.maxEnergy }}</div>
     <div>人口 {{ store.player.population }}/{{ store.player.populationCap }}</div>
+    <button type="button" :disabled="store.snapshot.phase === 'GAME_OVER'" @click="store.togglePause()">
+      {{ store.paused ? '继续' : '暂停' }}
+    </button>
     <button type="button" :disabled="!store.isOperation" @click="store.endOperation()">结束操作</button>
     <button type="button" class="ghost" @click="store.backToLobby()">返回大厅</button>
+    <span v-if="store.paused" class="paused">已暂停</span>
     <p v-if="store.lastReason" class="reason">{{ store.lastReason }}</p>
   </header>
 </template>
 
 <style>
 .hud {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 18px;
+  gap: 10px 16px;
   align-items: center;
-  padding: 10px 14px;
+  width: 100%;
+  padding: 10px 16px;
   background: #151b24;
   border-bottom: 1px solid #2c3644;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .hud button {
@@ -75,6 +88,10 @@ const countdown = computed(() => {
 .hud .ghost {
   background: transparent;
   border-color: #3d4b5c;
+}
+
+.hud .paused {
+  color: #ffe066;
 }
 
 .reason {

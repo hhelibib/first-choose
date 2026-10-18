@@ -103,6 +103,13 @@ function commandLabel(type: string | undefined): string {
         <dt>造价</dt>
         <dd>{{ formatResources(buildingDef.buildCost) }} · {{ formatDuration(buildingDef.buildTimeMs) }}</dd>
       </div>
+      <div v-if="buildingDef.harvest">
+        <dt>产出</dt>
+        <dd>
+          {{ buildingDef.harvest.resource === 'ore' ? '矿石' : buildingDef.harvest.resource === 'gold' ? '金' : '木材' }}
+          {{ buildingDef.harvest.amount }} / {{ formatDuration(buildingDef.harvest.intervalMs) }}
+        </dd>
+      </div>
       <div v-for="recipe in buildingDef.production" :key="recipe.unitTypeId">
         <dt>生产</dt>
         <dd>

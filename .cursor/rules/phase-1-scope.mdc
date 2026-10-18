@@ -7,12 +7,12 @@ alwaysApply: true
 
 行为以 `docs/requirements.md` 为准，结构以 `docs/architecture.md` 为准。
 
-- 循环是 OPERATION 15 秒静止下令，然后 AUTO 按固定 tick 执行。
+- 循环是 OPERATION 15 秒静止下令，然后 AUTO 15 秒按固定 tick 执行。
 - 一期只做本地 1 名人类 vs 1 个规则 AI。
-- 默认地图 16×16。每个单位或建筑同时只有一条指令，新指令覆盖旧指令。单位每回合移动格数受兵种 `moveRange` 限制。
+- 默认地图 24×24。每个单位或建筑同时只有一条指令，新指令覆盖旧指令。单位每回合移动格数受兵种 `moveRange` 限制。
 - 胜利只实现摧毁主基地。
 - 卡牌只有紧急修缮、火力覆盖、战地鼓舞。
-- 工人和 MOVE / GATHER / BUILD / REPAIR 不自动攻击。战斗单位在 IDLE / PATROL 时索敌。ATTACK 锁定目标。
+- 工人和 MOVE / BUILD / REPAIR 不自动攻击。战斗单位在 IDLE / PATROL 时索敌。ATTACK 锁定目标。工人不采集地图资源点；伐木场和采矿场建成后消耗工人并自动产出。
 - 维修只针对建筑。表现使用色块，不引入美术资源管线。
 
 禁止把指令队列、迷雾、天气、随机事件、英雄、匹配、观战、排行榜写进一期实现。

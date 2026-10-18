@@ -2,7 +2,7 @@
  * 本地对局：浏览器内持有 sim，操作阶段用墙钟倒计时，自走阶段按 50ms 累加 tick。
  * AI 只在进入操作阶段时通过命令接口下令。
  */
-import { OPERATION_MS, TICK_MS, type CardTarget, type Command, type DomainEvent, type EntityRef, type GameSnapshot, type MatchConfig, type PlayerId } from '@battle/shared'
+import { FIRST_OPERATION_MS, OPERATION_MS, TICK_MS, type CardTarget, type Command, type DomainEvent, type EntityRef, type GameSnapshot, type MatchConfig, type PlayerId } from '@battle/shared'
 import { createSimulator, REJECT, type CommandResult, type Simulator } from '@battle/sim'
 import { planOperation, type RuleAIOptions } from '@battle/ai'
 import { cloneData } from './clone.js'
@@ -15,10 +15,12 @@ export class LocalMatchRunner implements MatchRunner {
   private lastFrameMs = 0
   private autoAccMs = 0
   private operationEndsAtMs: number | null = null
+  private frozenOperationRemainMs: number | null = null
   private localPlayerId: PlayerId = 'p0'
   private aiPlayerId: PlayerId = 'p1'
   private aiOptions: RuleAIOptions = {}
   private running = false
+  private paused = false
 
   startMatch(options: StartMatchOptions = {}): void {
     this.dispose()
@@ -30,6 +32,8 @@ export class LocalMatchRunner implements MatchRunner {
     this.autoAccMs = 0
     this.lastFrameMs = performance.now()
     this.running = true
+    this.paused = false
+    this.frozenOperationRemainMs = null
     this.enterOperation(true)
     this.raf = requestAnimationFrame(this.loop)
   }
@@ -86,6 +90,7 @@ export class LocalMatchRunner implements MatchRunner {
     }
     this.sim.endOperationPhase()
     this.operationEndsAtMs = null
+    this.frozenOperationRemainMs = null
     this.autoAccMs = 0
     this.emitPhase()
     this.emitSnapshot([])
@@ -114,7 +119,34 @@ export class LocalMatchRunner implements MatchRunner {
     }
     this.sim = null
     this.operationEndsAtMs = null
+    this.frozenOperationRemainMs = null
+    this.paused = false
     this.autoAccMs = 0
+  }
+
+  setPaused(paused: boolean): void {
+    if (!this.sim || this.paused === paused) {
+      return
+    }
+    if (this.sim.getState().phase === 'GAME_OVER') {
+      return
+    }
+    const now = performance.now()
+    if (paused) {
+      if (this.operationEndsAtMs !== null) {
+        this.frozenOperationRemainMs = Math.max(0, this.operationEndsAtMs - now)
+        this.operationEndsAtMs = null
+      }
+      this.paused = true
+    } else {
+      if (this.frozenOperationRemainMs !== null) {
+        this.operationEndsAtMs = now + this.frozenOperationRemainMs
+        this.frozenOperationRemainMs = null
+      }
+      this.paused = false
+      this.lastFrameMs = now
+    }
+    this.emitPhase()
   }
 
   private loop = (now: number): void => {
@@ -122,6 +154,9 @@ export class LocalMatchRunner implements MatchRunner {
       return
     }
     this.raf = requestAnimationFrame(this.loop)
+    if (this.paused) {
+      return
+    }
     const dt = Math.min(100, now - this.lastFrameMs)
     this.lastFrameMs = now
     const phase = this.sim.getState().phase
@@ -174,7 +209,9 @@ export class LocalMatchRunner implements MatchRunner {
       this.sim.startOperationPhase()
     }
     planOperation(this.sim, this.aiPlayerId, this.aiOptions)
-    this.operationEndsAtMs = performance.now() + OPERATION_MS
+    const duration = this.sim.getState().round <= 1 ? FIRST_OPERATION_MS : OPERATION_MS
+    this.operationEndsAtMs = performance.now() + duration
+    this.frozenOperationRemainMs = null
     this.emitPhase()
     this.emitSnapshot([])
   }
@@ -199,7 +236,13 @@ export class LocalMatchRunner implements MatchRunner {
       phase: state.phase,
       round: state.round,
       operationEndsAtMs: this.operationEndsAtMs,
+      operationRemainMs: this.paused
+        ? this.frozenOperationRemainMs
+        : this.operationEndsAtMs !== null
+          ? Math.max(0, this.operationEndsAtMs - performance.now())
+          : null,
       phaseTicksRemaining: state.phaseTicksRemaining,
+      paused: this.paused,
     }
     for (const listener of this.listeners) {
       listener.onPhase(info)

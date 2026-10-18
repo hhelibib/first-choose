@@ -1,4 +1,8 @@
-export const CELL = 40
+export let CELL = 40
+
+export function setCellSize(size: number): void {
+  CELL = size
+}
 
 export const COLOR = {
   background: 0x12161c,

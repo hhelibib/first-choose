@@ -147,6 +147,7 @@ export function createInitialState(options: {
         cooldownMs: 0,
         builderId: null,
         productionRemainingMs: 0,
+        harvestProgressMs: 0,
       }
       state.buildingSeq += 1
       if (!occupyBuilding(state.occupancy, building)) {

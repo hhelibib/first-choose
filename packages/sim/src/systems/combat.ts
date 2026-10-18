@@ -1,5 +1,5 @@
 /**
- * 战斗系统。工人与 MOVE/GATHER/BUILD/REPAIR 不自动攻击。
+ * 战斗系统。工人与 MOVE/BUILD/REPAIR 不自动攻击。
  * IDLE/PATROL 按射程索敌；ATTACK 锁定目标。结算按攻击者 ID 升序。
  */
 import { TICK_MS } from '@battle/shared'

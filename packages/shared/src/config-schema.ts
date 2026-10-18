@@ -111,7 +111,7 @@ const buildingDefinitionSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().min(1),
-  role: z.enum(['MAIN_BASE', 'PRODUCTION', 'DEFENSE', 'WAREHOUSE']),
+  role: z.enum(['MAIN_BASE', 'PRODUCTION', 'DEFENSE', 'WAREHOUSE', 'RESOURCE']),
   hp: z.number().int().positive(),
   armor: z.number().int().nonnegative(),
   size: z.object({
@@ -130,6 +130,13 @@ const buildingDefinitionSchema = z.object({
       timeMs: z.number().int().positive(),
     }),
   ),
+  harvest: z
+    .object({
+      resource: z.enum(['wood', 'ore', 'gold']),
+      amount: z.number().int().positive(),
+      intervalMs: z.number().int().positive(),
+    })
+    .optional(),
 })
 
 const cardEffectSchema = z.discriminatedUnion('type', [

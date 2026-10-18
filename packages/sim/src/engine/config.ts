@@ -36,13 +36,15 @@ export const BUILDING_TYPE_IDS = {
   mainBase: 'main-base',
   barracks: 'barracks',
   arrowTower: 'arrow-tower',
+  lumberCamp: 'lumber-camp',
+  oreCamp: 'ore-camp',
 } as const
 
 export const unitDefinitions: Record<string, UnitDefinition> = {
   [UNIT_TYPE_IDS.worker]: {
     id: UNIT_TYPE_IDS.worker,
     name: '工人',
-    description: '负责采集、建造和维修。每回合最多走 6 格，不会主动攻击。',
+    description: '建造资源建筑、兵营和防御。建成伐木场或采矿场后该工人会并入建筑。不会主动攻击。',
     role: 'WORKER',
     hp: 40,
     attack: 0,
@@ -55,7 +57,7 @@ export const unitDefinitions: Record<string, UnitDefinition> = {
     gatherMs: 1000,
     population: 1,
     autoAttack: false,
-    commands: ['MOVE', 'GATHER', 'BUILD', 'REPAIR', 'STOP'],
+    commands: ['MOVE', 'BUILD', 'REPAIR', 'STOP'],
   },
   [UNIT_TYPE_IDS.fighter]: {
     id: UNIT_TYPE_IDS.fighter,
@@ -81,7 +83,7 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
   [BUILDING_TYPE_IDS.mainBase]: {
     id: BUILDING_TYPE_IDS.mainBase,
     name: '主基地',
-    description: '阵营核心。被摧毁即失败，也是工人卸货的地点。',
+    description: '阵营核心。被摧毁即失败。',
     role: 'MAIN_BASE',
     hp: 800,
     armor: 0,
@@ -123,6 +125,38 @@ export const buildingDefinitions: Record<string, BuildingDefinition> = {
     buildTimeMs: 8000,
     production: [],
   },
+  [BUILDING_TYPE_IDS.lumberCamp]: {
+    id: BUILDING_TYPE_IDS.lumberCamp,
+    name: '伐木场',
+    description: '建成后消耗工人，之后每秒自动产出木材。',
+    role: 'RESOURCE',
+    hp: 200,
+    armor: 0,
+    size: { w: 1, h: 1 },
+    attack: 0,
+    attackIntervalMs: 0,
+    attackRange: 0,
+    buildCost: { wood: 60, ore: 0, gold: 0 },
+    buildTimeMs: 6000,
+    production: [],
+    harvest: { resource: 'wood', amount: 8, intervalMs: 1000 },
+  },
+  [BUILDING_TYPE_IDS.oreCamp]: {
+    id: BUILDING_TYPE_IDS.oreCamp,
+    name: '采矿场',
+    description: '建成后消耗工人，之后每秒自动产出矿石。',
+    role: 'RESOURCE',
+    hp: 220,
+    armor: 0,
+    size: { w: 1, h: 1 },
+    attack: 0,
+    attackIntervalMs: 0,
+    attackRange: 0,
+    buildCost: { wood: 40, ore: 30, gold: 0 },
+    buildTimeMs: 8000,
+    production: [],
+    harvest: { resource: 'ore', amount: 5, intervalMs: 1000 },
+  },
 }
 
 export const cardDefinitions: Record<string, CardDefinition> = {
@@ -160,30 +194,25 @@ function makeTerrain(width: number, height: number, blocked: GridPos[]): Terrain
 }
 
 const DEFAULT_BLOCKED: GridPos[] = [
-  { x: 4, y: 7 },
-  { x: 5, y: 7 },
-  { x: 6, y: 7 },
-  { x: 9, y: 8 },
-  { x: 10, y: 8 },
-  { x: 11, y: 8 },
+  { x: 5, y: 11 },
+  { x: 6, y: 11 },
+  { x: 7, y: 11 },
+  { x: 8, y: 11 },
+  { x: 15, y: 12 },
+  { x: 16, y: 12 },
+  { x: 17, y: 12 },
+  { x: 18, y: 12 },
 ]
 
 export function createDefaultMatchConfig(): MatchConfig {
   return parseMatchConfig({
-    id: 'default-16x16',
+    id: 'default-24x24',
     map: {
-      id: 'default-16x16',
+      id: 'default-24x24',
       width: DEFAULT_MAP_WIDTH,
       height: DEFAULT_MAP_HEIGHT,
       terrain: makeTerrain(DEFAULT_MAP_WIDTH, DEFAULT_MAP_HEIGHT, DEFAULT_BLOCKED),
-      resourceNodes: [
-        { id: 'wood-nw', resource: 'wood', pos: { x: 4, y: 4 }, amount: 300 },
-        { id: 'wood-se', resource: 'wood', pos: { x: 11, y: 11 }, amount: 300 },
-        { id: 'wood-ne', resource: 'wood', pos: { x: 11, y: 4 }, amount: 300 },
-        { id: 'wood-sw', resource: 'wood', pos: { x: 4, y: 11 }, amount: 300 },
-        { id: 'ore-n', resource: 'ore', pos: { x: 7, y: 3 }, amount: 200 },
-        { id: 'ore-s', resource: 'ore', pos: { x: 8, y: 12 }, amount: 200 },
-      ],
+      resourceNodes: [],
       players: [
         {
           start: { x: 2, y: 2 },
@@ -196,13 +225,13 @@ export function createDefaultMatchConfig(): MatchConfig {
           ],
         },
         {
-          start: { x: 13, y: 13 },
+          start: { x: 20, y: 20 },
           teamId: 1,
-          buildings: [{ typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 13, y: 13 } }],
+          buildings: [{ typeId: BUILDING_TYPE_IDS.mainBase, origin: { x: 20, y: 20 } }],
           units: [
-            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 12, y: 13 } },
-            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 13, y: 12 } },
-            { typeId: UNIT_TYPE_IDS.fighter, pos: { x: 12, y: 12 } },
+            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 19, y: 20 } },
+            { typeId: UNIT_TYPE_IDS.worker, pos: { x: 20, y: 19 } },
+            { typeId: UNIT_TYPE_IDS.fighter, pos: { x: 19, y: 19 } },
           ],
         },
       ],

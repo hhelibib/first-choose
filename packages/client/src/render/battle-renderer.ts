@@ -14,7 +14,7 @@ import {
   previewReachable,
   rangeCells,
 } from '../preview/command-preview.js'
-import { CELL, COLOR, ownerColor } from './colors.js'
+import { CELL, COLOR, ownerColor, setCellSize } from './colors.js'
 
 export interface RenderView {
   selected: EntityRef | null
@@ -27,6 +27,11 @@ export interface RenderView {
   isOperation: boolean
 }
 
+const MAP_EDGE_PAD = 0
+const MIN_ZOOM = 0.8
+const MAX_ZOOM = 2.8
+const MAX_OUTSIDE_CELLS = 2
+
 export class BattleRenderer {
   readonly app = new Application()
   private readonly terrain = new Graphics()
@@ -38,6 +43,15 @@ export class BattleRenderer {
   private readonly labels = new Container()
   private flashes: Array<{ x: number; y: number; until: number }> = []
   private lastEvents: DomainEvent[] = []
+  private zoom = 1
+  private panX = 0
+  private panY = 0
+  private originX = 0
+  private originY = 0
+  private mapCols = 1
+  private mapRows = 1
+  private viewW = 1
+  private viewH = 1
 
   async mount(canvas: HTMLCanvasElement, parent: HTMLElement): Promise<void> {
     await this.app.init({
@@ -59,13 +73,76 @@ export class BattleRenderer {
 
   gridAt(clientX: number, clientY: number, snapshot: GameSnapshot): GridPos | null {
     const rect = this.app.canvas.getBoundingClientRect()
-    const origin = mapOrigin(this.app.screen.width, this.app.screen.height, snapshot.map.width, snapshot.map.height)
-    const x = Math.floor((clientX - rect.left - origin.x) / CELL)
-    const y = Math.floor((clientY - rect.top - origin.y) / CELL)
+    this.layout(this.app.screen.width, this.app.screen.height, snapshot.map.width, snapshot.map.height)
+    const local = this.screenToLocal(clientX - rect.left, clientY - rect.top)
+    const x = Math.floor(local.x / CELL)
+    const y = Math.floor(local.y / CELL)
     if (x < 0 || y < 0 || x >= snapshot.map.width || y >= snapshot.map.height) {
       return null
     }
     return { x, y }
+  }
+
+  zoomAt(clientX: number, clientY: number, factor: number): void {
+    const rect = this.app.canvas.getBoundingClientRect()
+    const lx = clientX - rect.left
+    const ly = clientY - rect.top
+    const before = this.screenToLocal(lx, ly)
+    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.zoom * factor))
+    this.panX = lx - this.originX - before.x * this.zoom
+    this.panY = ly - this.originY - before.y * this.zoom
+    this.clampPan()
+  }
+
+  panBy(dx: number, dy: number): void {
+    this.panX += dx
+    this.panY += dy
+    this.clampPan()
+  }
+
+  resetView(): void {
+    this.zoom = 1
+    this.panX = 0
+    this.panY = 0
+    this.clampPan()
+  }
+
+  zoomBy(factor: number): void {
+    const cx = this.app.screen.width / 2
+    const cy = this.app.screen.height / 2
+    const before = this.screenToLocal(cx, cy)
+    this.zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, this.zoom * factor))
+    this.panX = cx - this.originX - before.x * this.zoom
+    this.panY = cy - this.originY - before.y * this.zoom
+    this.clampPan()
+  }
+
+  private screenToLocal(lx: number, ly: number): { x: number; y: number } {
+    return {
+      x: (lx - this.originX - this.panX) / this.zoom,
+      y: (ly - this.originY - this.panY) / this.zoom,
+    }
+  }
+
+  private layout(viewW: number, viewH: number, width: number, height: number): void {
+    const innerW = Math.max(1, viewW - MAP_EDGE_PAD * 2)
+    const innerH = Math.max(1, viewH - MAP_EDGE_PAD * 2)
+    setCellSize(Math.max(16, Math.ceil(Math.max(innerW / width, innerH / height))))
+    const mapW = width * CELL
+    const mapH = height * CELL
+    this.viewW = viewW
+    this.viewH = viewH
+    this.mapCols = width
+    this.mapRows = height
+    this.originX = MAP_EDGE_PAD + (innerW - mapW) / 2
+    this.originY = MAP_EDGE_PAD + (innerH - mapH) / 2
+    this.clampPan()
+  }
+
+  private clampPan(): void {
+    const margin = MAX_OUTSIDE_CELLS * CELL * this.zoom
+    this.panX = clampPanAxis(this.panX, this.originX, this.mapCols * CELL * this.zoom, this.viewW, margin)
+    this.panY = clampPanAxis(this.panY, this.originY, this.mapRows * CELL * this.zoom, this.viewH, margin)
   }
 
   draw(
@@ -74,8 +151,9 @@ export class BattleRenderer {
     config: MatchConfig,
     view: RenderView,
   ): void {
-    const origin = mapOrigin(this.app.screen.width, this.app.screen.height, snapshot.map.width, snapshot.map.height)
-    this.app.stage.position.set(origin.x, origin.y)
+    this.layout(this.app.screen.width, this.app.screen.height, snapshot.map.width, snapshot.map.height)
+    this.app.stage.position.set(this.originX + this.panX, this.originY + this.panY)
+    this.app.stage.scale.set(this.zoom)
     this.app.stage.hitArea = new Rectangle(0, 0, snapshot.map.width * CELL, snapshot.map.height * CELL)
     this.collectFlashes(view.events)
     this.drawTerrain(snapshot)
@@ -148,7 +226,7 @@ export class BattleRenderer {
       const pos = interpolateUnit(unit, prevUnit, config, alpha)
       const selected = view.selected?.kind === 'unit' && view.selected.id === unit.id
       const color = ownerColor(unit.ownerId)
-      const r = 12
+      const r = Math.max(5, Math.floor(CELL * 0.32))
       const cx = pos.x * CELL + CELL / 2
       const cy = pos.y * CELL + CELL / 2
       if (selected) {
@@ -241,7 +319,7 @@ export class BattleRenderer {
     for (const building of Object.values(snapshot.buildings)) {
       const text = new Text({
         text: buildingLabel(building),
-        style: { fontSize: 11, fill: 0xf2f5f8, fontFamily: 'Segoe UI, sans-serif' },
+        style: { fontSize: Math.max(9, Math.floor(CELL * 0.28)), fill: 0xf2f5f8, fontFamily: 'Segoe UI, sans-serif' },
       })
       text.x = building.origin.x * CELL + 4
       text.y = building.origin.y * CELL + 4
@@ -262,11 +340,13 @@ export class BattleRenderer {
   }
 }
 
-function mapOrigin(viewW: number, viewH: number, width: number, height: number): { x: number; y: number } {
-  return {
-    x: Math.max(8, (viewW - width * CELL) / 2),
-    y: Math.max(8, (viewH - height * CELL) / 2),
+function clampPanAxis(pan: number, origin: number, scaled: number, view: number, margin: number): number {
+  const min = view - margin - scaled - origin
+  const max = margin - origin
+  if (min > max) {
+    return (min + max) / 2
   }
+  return Math.min(max, Math.max(min, pan))
 }
 
 function interpolateUnit(unit: Unit, prev: Unit | null, config: MatchConfig, alpha: number): GridPos {
@@ -322,6 +402,12 @@ function buildingLabel(building: Building): string {
   }
   if (building.role === 'DEFENSE') {
     return building.state === 'CONSTRUCTING' ? '箭塔…' : '箭塔'
+  }
+  if (building.typeId === 'lumber-camp') {
+    return building.state === 'CONSTRUCTING' ? '伐木…' : '伐木场'
+  }
+  if (building.typeId === 'ore-camp') {
+    return building.state === 'CONSTRUCTING' ? '采矿…' : '采矿场'
   }
   return building.typeId
 }

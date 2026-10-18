@@ -26,6 +26,8 @@ export class RemoteMatchRunner implements MatchRunner {
 
   endOperation(): void {}
 
+  setPaused(_paused: boolean): void {}
+
   subscribe(_listener: MatchListener): () => void {
     return () => {}
   }

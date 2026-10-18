@@ -59,13 +59,14 @@ describe('阶段机', () => {
 
   it('每个逻辑 tick 固定 50ms', () => {
     assert.equal(TICK_MS, 50)
-    assert.equal(AUTO_TICK_LIMIT, 600)
+    assert.equal(AUTO_TICK_LIMIT, 300)
   })
 
-  it('默认 16×16 对局可以开局', () => {
+  it('默认 24×24 对局可以开局', () => {
     const sim = createSimulator()
     sim.startMatch()
-    assert.equal(sim.getState().map.width, 16)
+    assert.equal(sim.getState().map.width, 24)
+    assert.equal(sim.getState().map.height, 24)
     assert.equal(Object.keys(sim.getState().units).length, 6)
     assert.equal(Object.keys(sim.getState().buildings).length, 2)
   })

@@ -36,6 +36,10 @@ export function cardPlayed(playerId: PlayerId, cardId: string): DomainEvent {
   return { type: 'CARD_PLAYED', playerId, cardId }
 }
 
+export function workerConsumed(unitId: string, buildingId: string): DomainEvent {
+  return { type: 'WORKER_CONSUMED', unitId, buildingId }
+}
+
 export function victory(winnerId: string | null, condition: string): DomainEvent {
   return { type: 'VICTORY', winnerId, condition }
 }

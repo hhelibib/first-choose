@@ -1,6 +1,6 @@
 /**
  * 规则 AI。读快照、走命令接口，不直接改 GameState。
- * 决策顺序：工人（维修/采集/建造）→ 生产 → 战斗单位攻击或巡逻 → 出牌。
+ * 决策顺序：工人（维修/资源建筑/兵营）→ 生产 → 战斗单位攻击或巡逻 → 出牌。
  */
 import { CARD_IDS } from '@battle/shared'
 import type { Building, GameState, GridPos, Unit } from '@battle/shared'
@@ -93,7 +93,7 @@ export function planOperation(sim: Simulator, playerId: string, options: RuleAIO
   }
   const base = mainBase(state, playerId)
 
-  // 工人：优先修主基地，资源紧张则采集，否则建兵营/箭塔。
+  // 工人：优先修主基地，然后补伐木场/采矿场，再兵营/箭塔。
   for (const worker of ownUnits(state, playerId).filter((unit) => state.config.units[unit.typeId]?.role === 'WORKER')) {
     if (limit.left <= 0) {
       break
@@ -104,25 +104,29 @@ export function planOperation(sim: Simulator, playerId: string, options: RuleAIO
       }
       continue
     }
-    const lowResources = player.resources.wood <= reserve.wood || player.resources.ore <= reserve.ore
-    const node = [...state.map.resourceNodes]
-      .filter((item) => item.remaining > 0)
-      .sort((a, b) => {
-        const da = manhattan(worker.pos, a.pos)
-        const db = manhattan(worker.pos, b.pos)
-        if (da !== db) {
-          return da - db
-        }
-        return a.id < b.id ? -1 : 1
-      })[0]
-    const hasBarracks = ownBuildings(state, playerId).some((building) => building.typeId === BUILDING_TYPE_IDS.barracks)
+    const lumberDef = state.config.buildings[BUILDING_TYPE_IDS.lumberCamp]
+    const oreDef = state.config.buildings[BUILDING_TYPE_IDS.oreCamp]
     const barracksDef = state.config.buildings[BUILDING_TYPE_IDS.barracks]
     const towerDef = state.config.buildings[BUILDING_TYPE_IDS.arrowTower]
-    if (lowResources && node) {
-      if (sim.submitCommand(playerId, { kind: 'unit', id: worker.id }, { type: 'GATHER', resourceNodeId: node.id }).accepted) {
+    const hasLumber = ownBuildings(state, playerId).some((building) => building.typeId === BUILDING_TYPE_IDS.lumberCamp)
+    const hasOre = ownBuildings(state, playerId).some((building) => building.typeId === BUILDING_TYPE_IDS.oreCamp)
+    const hasBarracks = ownBuildings(state, playerId).some((building) => building.typeId === BUILDING_TYPE_IDS.barracks)
+    const needResource = !hasLumber || !hasOre || player.resources.wood <= reserve.wood || player.resources.ore <= reserve.ore
+    if (needResource && lumberDef && !hasLumber && canPay(state, playerId, lumberDef.buildCost.wood, lumberDef.buildCost.ore)) {
+      const origin = findPlot(state, lumberDef.size, base?.origin ?? worker.pos)
+      if (origin && sim.submitCommand(playerId, { kind: 'unit', id: worker.id }, { type: 'BUILD', buildingTypeId: lumberDef.id, origin }).accepted) {
         issued(limit)
+        continue
       }
-    } else if (!hasBarracks && barracksDef && canPay(state, playerId, barracksDef.buildCost.wood, barracksDef.buildCost.ore)) {
+    }
+    if (needResource && oreDef && !hasOre && canPay(state, playerId, oreDef.buildCost.wood, oreDef.buildCost.ore)) {
+      const origin = findPlot(state, oreDef.size, base?.origin ?? worker.pos)
+      if (origin && sim.submitCommand(playerId, { kind: 'unit', id: worker.id }, { type: 'BUILD', buildingTypeId: oreDef.id, origin }).accepted) {
+        issued(limit)
+        continue
+      }
+    }
+    if (!hasBarracks && barracksDef && canPay(state, playerId, barracksDef.buildCost.wood, barracksDef.buildCost.ore)) {
       const origin = findPlot(state, barracksDef.size, base?.origin ?? worker.pos)
       if (origin && sim.submitCommand(playerId, { kind: 'unit', id: worker.id }, { type: 'BUILD', buildingTypeId: barracksDef.id, origin }).accepted) {
         issued(limit)
@@ -130,10 +134,6 @@ export function planOperation(sim: Simulator, playerId: string, options: RuleAIO
     } else if (towerDef && canPay(state, playerId, towerDef.buildCost.wood, towerDef.buildCost.ore)) {
       const origin = findPlot(state, towerDef.size, base?.origin ?? worker.pos)
       if (origin && sim.submitCommand(playerId, { kind: 'unit', id: worker.id }, { type: 'BUILD', buildingTypeId: towerDef.id, origin }).accepted) {
-        issued(limit)
-      }
-    } else if (node) {
-      if (sim.submitCommand(playerId, { kind: 'unit', id: worker.id }, { type: 'GATHER', resourceNodeId: node.id }).accepted) {
         issued(limit)
       }
     }

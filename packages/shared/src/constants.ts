@@ -7,11 +7,14 @@ export const TICK_MS = 50
 /** 操作阶段墙钟时长。倒计时放在 Runner，不进入权威状态。 */
 export const OPERATION_MS = 15_000
 
-/** 自走阶段 tick 上限，对应 30 秒。 */
-export const AUTO_TICK_LIMIT = 600
+/** 第 1 回合操作阶段更长，方便熟悉界面。 */
+export const FIRST_OPERATION_MS = 30_000
 
-export const DEFAULT_MAP_WIDTH = 16
-export const DEFAULT_MAP_HEIGHT = 16
+/** 自走阶段 tick 上限，对应 15 秒。 */
+export const AUTO_TICK_LIMIT = 300
+
+export const DEFAULT_MAP_WIDTH = 24
+export const DEFAULT_MAP_HEIGHT = 24
 
 export const MAX_ENERGY = 10
 export const ENERGY_PER_ROUND = 3

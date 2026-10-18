@@ -8,8 +8,10 @@ import { idleUnit } from '../commands/index.js'
 import { buildingPlaced } from '../engine/events.js'
 import { alreadyAdjacent, approachCell } from '../engine/entities.js'
 import { buildingCells, clonePos, sortedIds } from '../world/grid.js'
-import { occupyBuilding, plotBlockedByTerrainOrBuilding, plotBlockedByUnit, releaseBuilding } from '../world/occupancy.js'
+import { occupyBuilding, plotBlockedByTerrainOrBuilding, plotBlockedByUnit, releaseBuilding, releaseUnit } from '../world/occupancy.js'
 import { canPay, pay, refund } from '../world/resources.js'
+import { workerConsumed } from '../engine/events.js'
+import { refreshPopulation } from '../engine/state.js'
 
 export function cancelConstruction(state: GameState, buildingId: string): void {
   const building = state.buildings[buildingId]
@@ -143,6 +145,7 @@ export function processBuild(state: GameState, events: DomainEvent[]): void {
         cooldownMs: 0,
         builderId: unit.id,
         productionRemainingMs: 0,
+        harvestProgressMs: 0,
       }
       if (!occupyBuilding(state.occupancy, building)) {
         refund(player.resources, def.buildCost)
@@ -162,7 +165,20 @@ export function processBuild(state: GameState, events: DomainEvent[]): void {
     if (building.buildProgressMs >= def.buildTimeMs) {
       building.state = 'ACTIVE'
       building.builderId = null
-      idleUnit(unit)
+      if (def.harvest) {
+        consumeBuilder(state, unit, building.id, events)
+      } else {
+        idleUnit(unit)
+      }
     }
   }
+}
+
+function consumeBuilder(state: GameState, unit: Unit, buildingId: string, events: DomainEvent[]): void {
+  releaseUnit(state.occupancy, unit)
+  unit.state = 'DEAD'
+  unit.command = null
+  unit.path = []
+  events.push(workerConsumed(unit.id, buildingId))
+  refreshPopulation(state)
 }

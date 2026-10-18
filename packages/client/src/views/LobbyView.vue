@@ -16,7 +16,7 @@ function setDifficulty(value: string) {
       <label>
         地图
         <select disabled>
-          <option>默认 16×16</option>
+          <option>默认 24×24</option>
         </select>
       </label>
       <label>

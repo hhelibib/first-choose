@@ -59,6 +59,9 @@ export const useMatchStore = defineStore('match', {
     isOperation(state) {
       return state.snapshot?.phase === 'OPERATION'
     },
+    paused(state) {
+      return state.phaseInfo?.paused === true
+    },
     operationRemainMs(state) {
       if (!state.phaseInfo?.operationEndsAtMs) {
         return 0
@@ -95,16 +98,19 @@ export const useMatchStore = defineStore('match', {
           this.pruneSelection()
         },
         onPhase: (info) => {
+          const prev = this.phaseInfo
           this.phaseInfo = info
-          this.appendLog([
-            {
-              round: info.round,
-              tick: this.snapshot?.tick ?? 0,
-              text: info.phase === 'OPERATION' ? `第 ${info.round} 回合进入操作阶段` : info.phase === 'AUTO' ? '进入自走阶段' : `阶段：${info.phase}`,
-              relatedIds: [],
-              tone: 'system',
-            },
-          ])
+          if (prev?.phase !== info.phase || prev?.round !== info.round) {
+            this.appendLog([
+              {
+                round: info.round,
+                tick: this.snapshot?.tick ?? 0,
+                text: info.phase === 'OPERATION' ? `第 ${info.round} 回合进入操作阶段` : info.phase === 'AUTO' ? '进入自走阶段' : `阶段：${info.phase}`,
+                relatedIds: [],
+                tone: 'system',
+              },
+            ])
+          }
           if (info.phase !== 'OPERATION') {
             this.resetInteraction()
           }
@@ -208,6 +214,12 @@ export const useMatchStore = defineStore('match', {
       this.gateway.endOperation()
       this.resetInteraction()
     },
+    togglePause() {
+      if (!this.gateway || this.snapshot?.phase === 'GAME_OVER') {
+        return
+      }
+      this.gateway.setPaused(!this.paused)
+    },
     onLeftClick(pos: GridPos) {
       if (!this.snapshot) {
         return
@@ -266,10 +278,6 @@ export const useMatchStore = defineStore('match', {
       }
       if (hit.kind === 'building' && hit.building.ownerId !== this.localPlayerId && allowed.includes('ATTACK')) {
         this.sendCommand(this.selected, { type: 'ATTACK', target: { kind: 'building', id: hit.building.id } })
-        return
-      }
-      if (hit.kind === 'resource' && allowed.includes('GATHER')) {
-        this.sendCommand(this.selected, { type: 'GATHER', resourceNodeId: hit.node.id })
         return
       }
       if (allowed.includes('MOVE')) {

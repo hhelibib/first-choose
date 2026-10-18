@@ -30,6 +30,10 @@ export class MatchGateway {
     this.runner.endOperation()
   }
 
+  setPaused(paused: boolean): void {
+    this.runner.setPaused(paused)
+  }
+
   subscribe(listener: MatchListener): () => void {
     return this.runner.subscribe(listener)
   }

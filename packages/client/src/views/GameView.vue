@@ -5,7 +5,6 @@ import { useMatchStore } from '../store/match'
 import { BattleRenderer } from '../render/battle-renderer'
 import HudBar from '../components/HudBar.vue'
 import CommandPanel from '../components/CommandPanel.vue'
-import CardBar from '../components/CardBar.vue'
 import MatchLog from '../components/MatchLog.vue'
 
 const store = useMatchStore()
@@ -13,6 +12,11 @@ const { snapshot, prevSnapshot, config } = storeToRefs(store)
 const stageEl = ref<HTMLElement | null>(null)
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 let renderer: BattleRenderer | null = null
+let panning = false
+let didPan = false
+let lastPanX = 0
+let lastPanY = 0
+const PAN_THRESHOLD = 5
 
 onMounted(async () => {
   await nextTick()
@@ -47,13 +51,26 @@ function renderFrame(): void {
 }
 
 function onPointerMove(event: PointerEvent): void {
+  if (panning && renderer) {
+    const dx = event.clientX - lastPanX
+    const dy = event.clientY - lastPanY
+    if (!didPan && Math.hypot(dx, dy) >= PAN_THRESHOLD) {
+      didPan = true
+    }
+    if (didPan) {
+      renderer.panBy(dx, dy)
+      lastPanX = event.clientX
+      lastPanY = event.clientY
+    }
+    return
+  }
   if (!renderer || !snapshot.value) {
     return
   }
   store.setHover(renderer.gridAt(event.clientX, event.clientY, snapshot.value))
 }
 
-function onPointerDown(event: PointerEvent): void {
+function applyClick(event: PointerEvent): void {
   if (!renderer || !snapshot.value) {
     return
   }
@@ -72,6 +89,53 @@ function onPointerDown(event: PointerEvent): void {
   if (event.button === 0) {
     store.onLeftClick(pos)
   }
+}
+
+function onPointerDown(event: PointerEvent): void {
+  if (event.button === 0 || event.button === 1) {
+    panning = true
+    didPan = event.button === 1
+    lastPanX = event.clientX
+    lastPanY = event.clientY
+    canvasEl.value?.setPointerCapture(event.pointerId)
+    if (event.button === 1) {
+      event.preventDefault()
+    }
+    return
+  }
+  applyClick(event)
+}
+
+function onPointerUp(event: PointerEvent): void {
+  if (event.button === 0 || event.button === 1) {
+    if (event.button === 0 && !didPan) {
+      applyClick(event)
+    }
+    panning = false
+    didPan = false
+    if (canvasEl.value?.hasPointerCapture(event.pointerId)) {
+      canvasEl.value.releasePointerCapture(event.pointerId)
+    }
+  }
+}
+
+function onWheel(event: WheelEvent): void {
+  if (!renderer) {
+    return
+  }
+  renderer.zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12)
+}
+
+function zoomIn(): void {
+  renderer?.zoomBy(1.15)
+}
+
+function zoomOut(): void {
+  renderer?.zoomBy(1 / 1.15)
+}
+
+function resetView(): void {
+  renderer?.resetView()
 }
 
 const winnerText = () => {
@@ -94,24 +158,31 @@ const winnerText = () => {
 <template>
   <div class="game">
     <HudBar />
-    <div class="body">
-      <MatchLog />
+    <div class="battlefield">
       <div ref="stageEl" class="stage" @contextmenu.prevent>
         <canvas
           ref="canvasEl"
           @pointermove="onPointerMove"
           @pointerdown="onPointerDown"
-          @pointerleave="store.setHover(null)"
+          @pointerup="onPointerUp"
+          @pointercancel="panning = false; didPan = false; store.setHover(null)"
+          @wheel.prevent="onWheel"
         />
       </div>
+      <div class="zoom-tools">
+        <button type="button" @click="zoomIn">+</button>
+        <button type="button" @click="zoomOut">−</button>
+        <button type="button" @click="resetView">复位</button>
+      </div>
+      <MatchLog />
       <CommandPanel />
-    </div>
-    <CardBar />
-    <div v-if="store.snapshot?.phase === 'GAME_OVER'" class="over">
-      <div>
-        <h2>对局结束</h2>
-        <p>{{ winnerText() }}</p>
-        <button type="button" @click="store.backToLobby()">返回大厅</button>
+      <div v-if="store.paused" class="paused-note">已暂停</div>
+      <div v-if="store.snapshot?.phase === 'GAME_OVER'" class="over">
+        <div>
+          <h2>对局结束</h2>
+          <p>{{ winnerText() }}</p>
+          <button type="button" @click="store.backToLobby()">返回大厅</button>
+        </div>
       </div>
     </div>
   </div>
@@ -120,20 +191,19 @@ const winnerText = () => {
 <style>
 .game {
   height: 100%;
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-.body {
-  display: grid;
-  grid-template-columns: 260px 1fr 280px;
+.battlefield {
+  position: relative;
+  flex: 1;
   min-height: 0;
 }
 
 .stage {
-  min-width: 0;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   background: #0b0e13;
 }
 
@@ -141,11 +211,49 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
+  cursor: grab;
+}
+
+canvas:active {
+  cursor: grabbing;
+}
+
+.zoom-tools {
+  position: absolute;
+  right: 48px;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+}
+
+.zoom-tools button {
+  min-width: 36px;
+  padding: 6px 10px;
+  border: 1px solid #3d4b5c;
+  background: rgb(15 22 30 / 88%);
+  color: #e8edf2;
+  border-radius: 8px;
+}
+
+.paused-note {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 6px 12px;
+  background: rgb(15 22 30 / 88%);
+  border: 1px solid #ffe066;
+  color: #ffe066;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .over {
   position: absolute;
   inset: 0;
+  z-index: 8;
   background: rgb(8 10 14 / 72%);
   display: grid;
   place-items: center;
