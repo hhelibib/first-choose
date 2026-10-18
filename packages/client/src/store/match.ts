@@ -10,6 +10,7 @@ import { BUILDING_TYPE_IDS, UNIT_TYPE_IDS } from '@battle/sim'
 import type { RuleAIOptions } from '@battle/ai'
 import { createLocalGateway, type MatchGateway, type PhaseInfo } from '../gateway/index.js'
 import { pickAt } from '../preview/pick.js'
+import { linesFromCommandDiff, linesFromEvents, type MatchLogEntry } from '../log/match-log.js'
 
 export type InteractionMode = 'select' | 'build' | 'patrol' | 'repair' | 'card'
 export type AiDifficulty = 'default' | 'conservative' | 'aggressive'
@@ -34,6 +35,8 @@ export const useMatchStore = defineStore('match', {
     lastReason: '',
     phaseInfo: null as PhaseInfo | null,
     events: [] as DomainEvent[],
+    logEntries: [] as MatchLogEntry[],
+    logSeq: 0,
     winnerId: null as string | null,
     winnerCondition: '',
   }),
@@ -66,19 +69,42 @@ export const useMatchStore = defineStore('match', {
   actions: {
     startLocalMatch() {
       this.disposeGateway()
+      this.logEntries = []
+      this.logSeq = 0
+      this.winnerId = null
+      this.winnerCondition = ''
+      this.selected = null
+      this.snapshot = null
+      this.prevSnapshot = null
       const gateway = markRaw(createLocalGateway())
       this.gateway = gateway
       this.unsubscribe = gateway.subscribe({
         onSnapshot: (snapshot, events) => {
-          this.prevSnapshot = this.snapshot
+          const prev = this.snapshot
+          this.prevSnapshot = prev
           this.snapshot = snapshot
           this.snapshotAtMs = performance.now()
           this.events = events
           this.config = gateway.getConfig()
+          if (this.config) {
+            this.appendLog([
+              ...linesFromEvents(events, snapshot, this.config, this.localPlayerId),
+              ...linesFromCommandDiff(prev, snapshot, this.config, this.localPlayerId, events),
+            ])
+          }
           this.pruneSelection()
         },
         onPhase: (info) => {
           this.phaseInfo = info
+          this.appendLog([
+            {
+              round: info.round,
+              tick: this.snapshot?.tick ?? 0,
+              text: info.phase === 'OPERATION' ? `第 ${info.round} 回合进入操作阶段` : info.phase === 'AUTO' ? '进入自走阶段' : `阶段：${info.phase}`,
+              relatedIds: [],
+              tone: 'system',
+            },
+          ])
           if (info.phase !== 'OPERATION') {
             this.resetInteraction()
           }
@@ -93,9 +119,6 @@ export const useMatchStore = defineStore('match', {
       })
       gateway.startMatch({ aiOptions: difficultyOptions(this.difficulty) })
       this.view = 'game'
-      this.winnerId = null
-      this.winnerCondition = ''
-      this.selected = null
       this.resetInteraction()
     },
     backToLobby() {
@@ -104,6 +127,19 @@ export const useMatchStore = defineStore('match', {
       this.snapshot = null
       this.prevSnapshot = null
       this.config = null
+      this.logEntries = []
+      this.logSeq = 0
+    },
+    appendLog(lines: Array<Omit<MatchLogEntry, 'id'>>) {
+      if (lines.length === 0) {
+        return
+      }
+      const next = [...this.logEntries]
+      for (const line of lines) {
+        this.logSeq += 1
+        next.push({ ...line, id: this.logSeq })
+      }
+      this.logEntries = next.length > 300 ? next.slice(next.length - 300) : next
     },
     disposeGateway() {
       this.unsubscribe?.()

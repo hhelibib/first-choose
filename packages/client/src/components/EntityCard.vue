@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useMatchStore } from '../store/match'
+import { formatDuration, formatResources } from '../format/resources'
 
 const store = useMatchStore()
 
 const unitDef = computed(() => store.config?.units[store.selectedUnit?.typeId ?? ''] ?? null)
 const buildingDef = computed(() => store.config?.buildings[store.selectedBuilding?.typeId ?? ''] ?? null)
+const hasBuildCost = computed(() => {
+  const cost = buildingDef.value?.buildCost
+  return !!cost && (cost.wood > 0 || cost.ore > 0 || cost.gold > 0)
+})
 
 function commandLabel(type: string | undefined): string {
   switch (type) {
@@ -93,6 +98,18 @@ function commandLabel(type: string | undefined): string {
       <div>
         <dt>状态</dt>
         <dd>{{ store.selectedBuilding.state === 'CONSTRUCTING' ? '建造中' : commandLabel(store.selectedBuilding.command?.type) }}</dd>
+      </div>
+      <div v-if="hasBuildCost">
+        <dt>造价</dt>
+        <dd>{{ formatResources(buildingDef.buildCost) }} · {{ formatDuration(buildingDef.buildTimeMs) }}</dd>
+      </div>
+      <div v-for="recipe in buildingDef.production" :key="recipe.unitTypeId">
+        <dt>生产</dt>
+        <dd>
+          {{ store.config?.units[recipe.unitTypeId]?.name ?? recipe.unitTypeId }}
+          · {{ formatResources(recipe.cost) }}
+          · {{ formatDuration(recipe.timeMs) }}
+        </dd>
       </div>
     </dl>
   </section>

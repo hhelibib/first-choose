@@ -6,6 +6,7 @@ import { BattleRenderer } from '../render/battle-renderer'
 import HudBar from '../components/HudBar.vue'
 import CommandPanel from '../components/CommandPanel.vue'
 import CardBar from '../components/CardBar.vue'
+import MatchLog from '../components/MatchLog.vue'
 
 const store = useMatchStore()
 const { snapshot, prevSnapshot, config } = storeToRefs(store)
@@ -94,6 +95,7 @@ const winnerText = () => {
   <div class="game">
     <HudBar />
     <div class="body">
+      <MatchLog />
       <div ref="stageEl" class="stage" @contextmenu.prevent>
         <canvas
           ref="canvasEl"
@@ -125,7 +127,7 @@ const winnerText = () => {
 
 .body {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 260px 1fr 280px;
   min-height: 0;
 }
 
