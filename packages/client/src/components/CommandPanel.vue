@@ -1,16 +1,57 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { ResourceType, Resources } from '@battle/shared'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import type { Resources } from '@battle/shared'
 import { BUILDING_TYPE_IDS, useMatchStore } from '../store/match'
-import { canAfford, formatDuration, formatResources, resourceFull } from '../format/resources'
-import { buildingName, t, unitName as localizedUnit } from '../i18n/index'
+import { canAfford, formatDuration, formatResources } from '../format/resources'
+import { t, unitName as localizedUnit } from '../i18n/index'
+
+const HINT_W = 280
+const COMMAND_W = 320
 
 const store = useMatchStore()
 const panelEl = ref<HTMLElement | null>(null)
+const dragging = ref(false)
+let dragOffsetX = 0
+let dragOffsetY = 0
 
-const floating = computed(() => !!store.selected && !!store.commandAnchor)
+const floating = computed(() => store.isTargeting || (!!store.selected && !!store.commandAnchor))
+
+function clampHint(x: number, y: number): { x: number; y: number } {
+  const parent = panelEl.value?.parentElement
+  const viewW = parent?.clientWidth ?? 1280
+  const viewH = parent?.clientHeight ?? 720
+  const height = panelEl.value?.offsetHeight ?? 120
+  return {
+    x: Math.min(Math.max(8, x), Math.max(8, viewW - HINT_W - 8)),
+    y: Math.min(Math.max(8, y), Math.max(8, viewH - height - 8)),
+  }
+}
+
+function defaultHintPos(): { x: number; y: number } {
+  const parent = panelEl.value?.parentElement
+  const viewW = parent?.clientWidth ?? 1280
+  return clampHint(Math.max(8, (viewW - HINT_W) / 2), 72)
+}
+
+watch(
+  () => store.isTargeting,
+  async (targeting) => {
+    if (targeting && !store.orderHintPos) {
+      await nextTick()
+      store.orderHintPos = defaultHintPos()
+    }
+  },
+)
 
 const floatStyle = computed(() => {
+  if (store.isTargeting) {
+    const pos = store.orderHintPos ?? defaultHintPos()
+    return {
+      left: `${Math.round(pos.x)}px`,
+      top: `${Math.round(pos.y)}px`,
+      width: `${HINT_W}px`,
+    }
+  }
   const anchor = store.commandAnchor
   if (!floating.value || !anchor) {
     return {}
@@ -18,7 +59,7 @@ const floatStyle = computed(() => {
   const parent = panelEl.value?.parentElement
   const viewW = parent?.clientWidth ?? 1280
   const viewH = parent?.clientHeight ?? 720
-  const panelW = 320
+  const panelW = COMMAND_W
   const panelH = Math.min(280, viewH - 24)
   const gap = Math.max(8, Math.round(anchor.w * 0.2))
   let left = anchor.x + anchor.w + gap
@@ -38,8 +79,53 @@ const floatStyle = computed(() => {
   return {
     left: `${Math.round(left)}px`,
     top: `${Math.round(top)}px`,
+    width: `${panelW}px`,
     maxHeight: `${Math.round(panelH)}px`,
   }
+})
+
+function bindDrag(on: boolean): void {
+  const method = on ? 'addEventListener' : 'removeEventListener'
+  window[method]('pointermove', onDragMove)
+  window[method]('pointerup', onDragEnd)
+  window[method]('pointercancel', onDragEnd)
+}
+
+function onHintDown(event: PointerEvent): void {
+  if (event.button !== 0 || !store.isTargeting || !panelEl.value) {
+    return
+  }
+  const host = panelEl.value
+  const rect = host.getBoundingClientRect()
+  dragging.value = true
+  dragOffsetX = event.clientX - rect.left
+  dragOffsetY = event.clientY - rect.top
+  bindDrag(true)
+  event.preventDefault()
+}
+
+function onDragMove(event: Event): void {
+  if (!dragging.value || !panelEl.value) {
+    return
+  }
+  const mouse = event as PointerEvent
+  const parent = panelEl.value.parentElement?.getBoundingClientRect()
+  if (!parent) {
+    return
+  }
+  store.orderHintPos = clampHint(mouse.clientX - parent.left - dragOffsetX, mouse.clientY - parent.top - dragOffsetY)
+}
+
+function onDragEnd(): void {
+  if (!dragging.value) {
+    return
+  }
+  dragging.value = false
+  bindDrag(false)
+}
+
+onBeforeUnmount(() => {
+  bindDrag(false)
 })
 
 const commands = computed(() => store.config?.units[store.selectedUnit?.typeId ?? '']?.commands ?? [])
@@ -53,15 +139,8 @@ const oreCamp = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.oreCamp
 const goldCamp = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.goldCamp] ?? null)
 const barracks = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.barracks] ?? null)
 const arrowTower = computed(() => store.config?.buildings[BUILDING_TYPE_IDS.arrowTower] ?? null)
-const placing = computed(() => (store.mode === 'build' && store.buildTypeId ? store.config?.buildings[store.buildTypeId] : null))
-const repair = computed(() => store.config?.repair ?? null)
-
 function unitName(typeId: string): string {
   return localizedUnit(typeId, store.config?.units[typeId]?.name)
-}
-
-function harvestName(type: ResourceType): string {
-  return resourceFull(type)
 }
 
 function recipeHint(typeId: string, cost: Resources, timeMs: number): string {
@@ -71,10 +150,6 @@ function recipeHint(typeId: string, cost: Resources, timeMs: number): string {
     parts.push(t('order.pop', { n: pop }))
   }
   return parts.join(' · ')
-}
-
-function bName(typeId: string, fallback?: string): string {
-  return buildingName(typeId, fallback)
 }
 
 function buildHint(cost: Resources, timeMs: number): string {
@@ -87,15 +162,19 @@ function shortOn(cost: Resources): boolean {
 </script>
 
 <template>
-  <aside v-if="floating" ref="panelEl" class="command-panel" :style="floatStyle">
+  <aside
+    v-if="floating"
+    ref="panelEl"
+    class="command-panel"
+    :class="{ targeting: store.isTargeting, dragging }"
+    :style="floatStyle"
+  >
     <div v-if="store.isTargeting" class="order-hint">
-      <p>{{ t('order.confirm') }}</p>
-      <p v-if="placing" class="hint">
-        {{ t('order.place', { name: bName(store.buildTypeId ?? '', placing.name), hint: buildHint(placing.buildCost, placing.buildTimeMs) }) }}
-        <template v-if="placing.harvest">{{ t('order.harvest', { res: harvestName(placing.harvest.resource) }) }}</template>
-      </p>
-      <p v-else-if="store.mode === 'repair' && repair" class="hint">{{ t('order.repair') }}</p>
-      <p v-else-if="store.mode === 'patrol'" class="hint">{{ t('order.patrol') }}</p>
+      <div class="hint-head" @pointerdown="onHintDown">
+        <h2>{{ t('order.hintTitle') }}</h2>
+        <span class="drag-hint">{{ t('inspect.drag') }}</span>
+        <button type="button" class="cancel" @pointerdown.stop @click="store.cancelTargeting()">{{ t('order.cancel') }}</button>
+      </div>
     </div>
     <template v-else>
     <div v-if="store.selectedUnit" class="actions">
@@ -163,9 +242,48 @@ function shortOn(cost: Resources): boolean {
   pointer-events: auto;
 }
 
+.command-panel.targeting {
+  z-index: 8;
+}
+
+.command-panel.dragging {
+  user-select: none;
+}
+
 .command-panel .order-hint {
   display: grid;
   gap: 6px;
+}
+
+.command-panel .hint-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
+}
+
+.command-panel.dragging .hint-head {
+  cursor: grabbing;
+}
+
+.command-panel .hint-head h2 {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+}
+
+.command-panel .hint-head .drag-hint {
+  color: #7f90a3;
+  font-size: 11px;
+}
+
+.command-panel .hint-head .cancel {
+  padding: 2px 8px;
+  border: 1px solid #3d4b5c;
+  background: #1d2632;
+  color: #e8edf2;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 .command-panel .order-hint > p:first-child {

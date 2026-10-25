@@ -7,8 +7,9 @@ import { BattleRenderer } from '../render/battle-renderer'
 import HudBar from '../components/HudBar.vue'
 import CommandPanel from '../components/CommandPanel.vue'
 import InspectorPanel from '../components/InspectorPanel.vue'
-import MatchLog from '../components/MatchLog.vue'
+import LeftDockStack from '../components/LeftDockStack.vue'
 import CardBar from '../components/CardBar.vue'
+import TipHost from '../components/TipHost.vue'
 
 const store = useMatchStore()
 const { snapshot, prevSnapshot, config } = storeToRefs(store)
@@ -231,9 +232,10 @@ const winnerText = computed(() => {
       </div>
       <HudBar :key="locale" />
       <InspectorPanel :key="locale" />
-      <MatchLog :key="locale" />
+      <LeftDockStack :key="`docks-${locale}`" />
       <CommandPanel :key="locale" />
-      <CardBar :key="locale" />
+      <TipHost :key="locale" />
+<!--      <CardBar :key="locale" />-->
       <ul v-if="combatFeed.length" class="combat-feed">
         <li v-for="line in combatFeed" :key="line.id">{{ line.text }}</li>
       </ul>

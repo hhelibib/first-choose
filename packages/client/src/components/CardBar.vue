@@ -26,7 +26,6 @@ function costOf(cardId: string): number {
       {{ nameOf(card.cardId) }}
       <span>{{ t('card.energy', { n: costOf(card.cardId) }) }}</span>
     </button>
-    <p>{{ t('card.hint') }}</p>
   </footer>
 </template>
 

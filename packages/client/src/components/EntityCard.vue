@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useMatchStore } from '../store/match'
+import { etaTick } from '../format/eta'
 import { formatDuration, formatResources, resourceFull } from '../format/resources'
 import { buildingDesc, buildingName, commandName, t, unitDesc, unitName } from '../i18n/index'
 
@@ -11,6 +12,55 @@ const buildingDef = computed(() => store.config?.buildings[store.selectedBuildin
 const hasBuildCost = computed(() => {
   const cost = buildingDef.value?.buildCost
   return !!cost && (cost.wood > 0 || cost.ore > 0 || cost.gold > 0)
+})
+const currentTick = computed(() => store.snapshot?.tick ?? 0)
+
+const constructJob = computed(() => {
+  const tick = currentTick.value
+  const selected = store.selectedBuilding
+  const selectedDef = buildingDef.value
+  if (selected && selected.state === 'CONSTRUCTING' && selectedDef) {
+    const remain = Math.max(0, selectedDef.buildTimeMs - selected.buildProgressMs)
+    return {
+      walking: false,
+      done: selected.buildProgressMs,
+      total: selectedDef.buildTimeMs,
+      remain,
+      tick: etaTick(tick, remain),
+    }
+  }
+  const unit = store.selectedUnit
+  if (!unit || unit.command?.type !== 'BUILD' || !store.snapshot || !store.config) {
+    return null
+  }
+  const typeId = unit.command.buildingTypeId
+  const def = store.config.buildings[typeId]
+  const site = Object.values(store.snapshot.buildings).find(
+    (building) => building.builderId === unit.id && building.state === 'CONSTRUCTING',
+  )
+  const total = def?.buildTimeMs ?? 0
+  const done = site?.buildProgressMs ?? unit.buildProgressMs
+  const remain = Math.max(0, total - done)
+  return {
+    walking: !site,
+    done,
+    total,
+    remain,
+    tick: etaTick(tick, remain),
+  }
+})
+
+const produceJob = computed(() => {
+  const building = store.selectedBuilding
+  if (!building || building.command?.type !== 'PRODUCE' || building.productionRemainingMs <= 0) {
+    return null
+  }
+  const typeId = building.command.unitTypeId
+  return {
+    name: unitName(typeId, store.config?.units[typeId]?.name),
+    remain: building.productionRemainingMs,
+    tick: etaTick(currentTick.value, building.productionRemainingMs),
+  }
 })
 
 function commandLabel(type: string | undefined): string {
@@ -57,6 +107,16 @@ function commandLabel(type: string | undefined): string {
         <dt>{{ t('inspect.command') }}</dt>
         <dd>{{ commandLabel(store.selectedUnit.command?.type) }}</dd>
       </div>
+      <div v-if="constructJob">
+        <dt>{{ t('inspect.queue') }}</dt>
+        <dd>
+          <template v-if="constructJob.walking">{{ t('inspect.buildWalk', { tick: constructJob.tick }) }}</template>
+          <template v-else>
+            {{ t('inspect.progress', { cur: constructJob.done, max: constructJob.total }) }}
+            · {{ t('inspect.buildEta', { tick: constructJob.tick, sec: formatDuration(constructJob.remain) }) }}
+          </template>
+        </dd>
+      </div>
     </dl>
   </section>
   <section v-else-if="store.selectedBuilding && buildingDef" class="entity-card">
@@ -82,6 +142,17 @@ function commandLabel(type: string | undefined): string {
       <div>
         <dt>{{ t('inspect.state') }}</dt>
         <dd>{{ store.selectedBuilding.state === 'CONSTRUCTING' ? t('inspect.building') : commandLabel(store.selectedBuilding.command?.type) }}</dd>
+      </div>
+      <div v-if="constructJob">
+        <dt>{{ t('inspect.queue') }}</dt>
+        <dd>
+          {{ t('inspect.progress', { cur: constructJob.done, max: constructJob.total }) }}
+          · {{ t('inspect.buildEta', { tick: constructJob.tick, sec: formatDuration(constructJob.remain) }) }}
+        </dd>
+      </div>
+      <div v-if="produceJob">
+        <dt>{{ t('inspect.queue') }}</dt>
+        <dd>{{ t('inspect.prodEta', { name: produceJob.name, tick: produceJob.tick, sec: formatDuration(produceJob.remain) }) }}</dd>
       </div>
       <div v-if="hasBuildCost">
         <dt>{{ t('inspect.cost') }}</dt>
@@ -136,7 +207,7 @@ function commandLabel(type: string | undefined): string {
 
 .entity-card dl div {
   display: grid;
-  grid-template-columns: 52px 1fr;
+  grid-template-columns: 48px 1fr;
   gap: 8px;
   font-size: 12px;
 }

@@ -15,6 +15,7 @@ const tables: Record<Locale, MessageTable> = {
 
 export const locales: Locale[] = ['zh-CN', 'zh-TW', 'en']
 
+// 检测语言类型
 function detectLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE)
@@ -62,6 +63,11 @@ export const localeModel = computed({
   },
 })
 
+/**
+ * 匹配 key 和填充值
+ * @param key
+ * @param params
+ */
 export function t(key: string, params?: Record<string, string | number>): string {
   const table = tables[locale.value]
   let text = table[key] ?? zhCN[key] ?? key
@@ -73,36 +79,65 @@ export function t(key: string, params?: Record<string, string | number>): string
   return text
 }
 
+/**
+ * 根据类型获取单位名称
+ * @param typeId
+ * @param fallback
+ */
 export function unitName(typeId: string, fallback?: string): string {
   const key = `unit.${typeId}.name`
   const value = t(key)
   return value === key ? (fallback ?? typeId) : value
 }
 
+/**
+ * 根据类型获取单位描述
+ * @param typeId
+ * @param fallback
+ */
 export function unitDesc(typeId: string, fallback?: string): string {
   const key = `unit.${typeId}.desc`
   const value = t(key)
   return value === key ? (fallback ?? '') : value
 }
 
+/**
+ * 根据类型获取建筑名称
+ * @param typeId
+ * @param fallback
+ */
 export function buildingName(typeId: string, fallback?: string): string {
   const key = `building.${typeId}.name`
   const value = t(key)
   return value === key ? (fallback ?? typeId) : value
 }
 
+/**
+ * 根据类型获取建筑描述
+ * @param typeId
+ * @param fallback
+ */
 export function buildingDesc(typeId: string, fallback?: string): string {
   const key = `building.${typeId}.desc`
   const value = t(key)
   return value === key ? (fallback ?? '') : value
 }
 
+/**
+ * 根据卡片id获取卡片名称
+ * @param cardId
+ * @param fallback
+ */
 export function cardName(cardId: string, fallback?: string): string {
   const key = `card.${cardId}.name`
   const value = t(key)
   return value === key ? (fallback ?? cardId) : value
 }
 
+/**
+ * 根据类型获取指令名称
+ * @param type
+ */
 export function commandName(type: string | undefined): string {
   if (!type) {
     return t('cmd.idle')

@@ -14,7 +14,7 @@ tick(deltaMs: number)
 state.phaseEndsAtMs = Date.now()
 id = crypto.randomUUID()
 
-// 采用：一次调用推进一个 50ms tick，标识来自状态计数器
+// 采用：一次调用推进一个 100ms tick，标识来自状态计数器
 tick(): TickResult
 state.phaseTicksRemaining -= 1
 id = `u${state.unitSeq++}`

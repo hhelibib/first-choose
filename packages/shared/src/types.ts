@@ -225,6 +225,9 @@ export interface VictoryRule {
 
 export type UnitRole = 'WORKER' | 'COMBAT'
 
+/**
+ * 兵种定义
+ */
 export interface UnitDefinition {
   id: string
   name: string
@@ -246,12 +249,18 @@ export interface UnitDefinition {
   commands: UnitCommandType[]
 }
 
+/**
+ * 配方定义
+ */
 export interface ProductionRecipe {
   unitTypeId: string
   cost: Resources
   timeMs: number
 }
 
+/**
+ * 建筑定义
+ */
 export interface BuildingDefinition {
   id: string
   name: string
@@ -271,6 +280,9 @@ export interface BuildingDefinition {
   harvest?: { resource: ResourceType; amount: number; intervalMs: number }
 }
 
+/**
+ * 修复配置
+ */
 export interface RepairConfig {
   intervalMs: number
   oreCost: number

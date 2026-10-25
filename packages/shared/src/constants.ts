@@ -1,14 +1,14 @@
 /**
  * 一期数值常量。地图宽高、能量、牌序、寻路邻居都固定，避免散落魔法数。
  */
-/** 逻辑 tick 长度。一次 `tick()` 固定推进这么多毫秒。 */
-export const TICK_MS = 50
+/** 逻辑 tick 长度。一次 `tick()` 固定推进这么多毫秒。1 秒 = 10 tick。 */
+export const TICK_MS = 100
 
 /** 操作阶段墙钟时长。倒计时放在 Runner，不进入权威状态。 */
 export const OPERATION_MS = 30_000
 
-/** 自走阶段 tick 上限，对应 15 秒。 */
-export const AUTO_TICK_LIMIT = 300
+/** 自走阶段 tick 上限，对应 15 秒（150 × 100ms）。 */
+export const AUTO_TICK_LIMIT = 150
 
 export const DEFAULT_MAP_WIDTH = 50
 export const DEFAULT_MAP_HEIGHT = 50
@@ -18,6 +18,9 @@ export const ENERGY_PER_ROUND = 3
 export const HAND_LIMIT = 5
 export const DEFAULT_POPULATION_CAP = 100
 
+/**
+ * 起始物资
+ */
 export const STARTING_FOOD = 80
 export const STARTING_WOOD = 100
 export const STARTING_STONE = 40

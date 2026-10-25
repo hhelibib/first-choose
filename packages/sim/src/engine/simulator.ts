@@ -1,5 +1,5 @@
 /**
- * 权威模拟入口：阶段机、命令提交、固定 50ms tick 编排。
+ * 权威模拟入口：阶段机、命令提交、固定 100ms tick 编排。
  * 禁止墙钟、DOM 和随机数进入本模块。
  */
 import { AUTO_TICK_LIMIT } from '@battle/shared'
@@ -178,7 +178,7 @@ export class GameSimulator implements Simulator {
     this.record({ type: 'PHASE_CHANGED', phase: 'AUTO', tick: this.state.tick })
   }
 
-  /** 一次调用推进一个 50ms 逻辑 tick。操作阶段或已结束时不推进模拟。 */
+  /** 一次调用推进一个 100ms 逻辑 tick。操作阶段或已结束时不推进模拟。 */
   tick(): TickResult {
     if (this.state.phase === 'GAME_OVER') {
       return {

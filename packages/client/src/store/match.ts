@@ -12,6 +12,15 @@ import { createLocalGateway, type MatchGateway, type PhaseInfo } from '../gatewa
 import { pickAt } from '../preview/pick.js'
 import { t } from '../i18n/index.js'
 import { linesFromCommandDiff, linesFromEvents, type MatchLogEntry } from '../log/match-log.js'
+import {
+  type TipId,
+  readMutedTips,
+  readShowRejectTipsPref,
+  readShowTipsPref,
+  writeMutedTips,
+  writeShowRejectTipsPref,
+  writeShowTipsPref,
+} from '../tips/prefs.js'
 
 export type InteractionMode = 'select' | 'build' | 'patrol' | 'repair' | 'card'
 export type AiDifficulty = 'default' | 'conservative' | 'aggressive'
@@ -43,7 +52,14 @@ export const useMatchStore = defineStore('match', {
     viewResetSeq: 0,
     commandAnchor: null as { x: number; y: number; w: number; h: number } | null,
     inspectorPos: null as { x: number; y: number } | null,
+    orderHintPos: null as { x: number; y: number } | null,
     showOrderHints: readOrderHintsPref(),
+    showOrdersDock: readFlagPref(ORDERS_DOCK_KEY, true),
+    showReportDock: readFlagPref(REPORT_DOCK_KEY, true),
+    showTips: readShowTipsPref(),
+    showRejectTips: readShowRejectTipsPref(),
+    mutedTips: readMutedTips() as TipId[],
+    sessionHiddenTips: [] as TipId[],
   }),
   getters: {
     player(state) {
@@ -174,6 +190,7 @@ export const useMatchStore = defineStore('match', {
       this.buildTypeId = null
       this.cardInstanceId = null
       this.patrolPoints = []
+      this.sessionHiddenTips = this.sessionHiddenTips.filter((id) => id !== 'target')
     },
     cancelTargeting() {
       this.resetInteraction()
@@ -221,6 +238,60 @@ export const useMatchStore = defineStore('match', {
     setShowOrderHints(value: boolean) {
       this.showOrderHints = value
       writeOrderHintsPref(value)
+    },
+    setShowOrdersDock(value: boolean) {
+      this.showOrdersDock = value
+      writeFlagPref(ORDERS_DOCK_KEY, value)
+    },
+    setShowReportDock(value: boolean) {
+      this.showReportDock = value
+      writeFlagPref(REPORT_DOCK_KEY, value)
+    },
+    shouldShowTip(id: TipId): boolean {
+      if (id === 'reject') {
+        if (!this.showRejectTips) {
+          return false
+        }
+      } else if (!this.showTips) {
+        return false
+      }
+      return !this.mutedTips.includes(id) && !this.sessionHiddenTips.includes(id)
+    },
+    dismissTip(id: TipId, mute: boolean) {
+      if (id === 'reject') {
+        this.lastReason = ''
+      } else if (!this.sessionHiddenTips.includes(id)) {
+        this.sessionHiddenTips.push(id)
+      }
+      if (mute && !this.mutedTips.includes(id)) {
+        this.mutedTips = [...this.mutedTips, id]
+        writeMutedTips(this.mutedTips)
+      }
+    },
+    setShowTips(value: boolean) {
+      this.showTips = value
+      writeShowTipsPref(value)
+      if (value) {
+        this.sessionHiddenTips = this.sessionHiddenTips.filter((id) => id === 'reject')
+      }
+    },
+    setShowRejectTips(value: boolean) {
+      this.showRejectTips = value
+      writeShowRejectTipsPref(value)
+      if (value) {
+        this.sessionHiddenTips = this.sessionHiddenTips.filter((id) => id !== 'reject')
+      } else {
+        this.lastReason = ''
+      }
+    },
+    resetMutedTips() {
+      this.mutedTips = []
+      this.sessionHiddenTips = []
+      writeMutedTips([])
+      this.showTips = true
+      this.showRejectTips = true
+      writeShowTipsPref(true)
+      writeShowRejectTipsPref(true)
     },
     sendCard(target: CardTarget) {
       if (!this.gateway || !this.cardInstanceId || !this.isOperation) {
@@ -375,25 +446,38 @@ export const useMatchStore = defineStore('match', {
 })
 
 const ORDER_HINTS_KEY = 'battle-ba-order-hints'
+const ORDERS_DOCK_KEY = 'battle-ba-orders-dock'
+const REPORT_DOCK_KEY = 'battle-ba-report-dock'
 
-function readOrderHintsPref(): boolean {
+function readFlagPref(key: string, fallback: boolean): boolean {
   try {
-    const saved = localStorage.getItem(ORDER_HINTS_KEY)
+    const saved = localStorage.getItem(key)
     if (saved === '0') {
       return false
+    }
+    if (saved === '1') {
+      return true
     }
   } catch {
     /* ignore */
   }
-  return true
+  return fallback
 }
 
-function writeOrderHintsPref(value: boolean): void {
+function writeFlagPref(key: string, value: boolean): void {
   try {
-    localStorage.setItem(ORDER_HINTS_KEY, value ? '1' : '0')
+    localStorage.setItem(key, value ? '1' : '0')
   } catch {
     /* ignore */
   }
+}
+
+function readOrderHintsPref(): boolean {
+  return readFlagPref(ORDER_HINTS_KEY, true)
+}
+
+function writeOrderHintsPref(value: boolean): void {
+  writeFlagPref(ORDER_HINTS_KEY, value)
 }
 
 function difficultyOptions(difficulty: AiDifficulty): RuleAIOptions {

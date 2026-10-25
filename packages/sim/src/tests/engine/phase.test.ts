@@ -57,9 +57,10 @@ describe('阶段机', () => {
     assert.equal(sim.getState().players['p0']?.energy, 10)
   })
 
-  it('每个逻辑 tick 固定 50ms', () => {
-    assert.equal(TICK_MS, 50)
-    assert.equal(AUTO_TICK_LIMIT, 300)
+  it('每个逻辑 tick 固定 100ms，1 秒 10 tick', () => {
+    assert.equal(TICK_MS, 100)
+    assert.equal(AUTO_TICK_LIMIT, 150)
+    assert.equal(AUTO_TICK_LIMIT * TICK_MS, 15_000)
   })
 
   it('默认 50×50 对局可以开局', () => {

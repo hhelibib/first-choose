@@ -1,5 +1,5 @@
 /**
- * 本地对局：浏览器内持有 sim，操作阶段用墙钟倒计时，自走阶段按 50ms 累加 tick。
+ * 本地对局：浏览器内持有 sim，操作阶段用墙钟倒计时，自走阶段按 100ms 累加 tick。
  * AI 只在进入操作阶段时通过命令接口下令。
  */
 import { OPERATION_MS, TICK_MS, type CardTarget, type Command, type DomainEvent, type EntityRef, type GameSnapshot, type MatchConfig, type PlayerId } from '@battle/shared'

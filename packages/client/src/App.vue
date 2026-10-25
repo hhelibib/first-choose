@@ -4,7 +4,7 @@ import { useMatchStore } from './store/match'
 import LobbyView from './views/LobbyView.vue'
 import GameView from './views/GameView.vue'
 
-const GAME_VERSION = '0.1.0'
+const GAME_VERSION = '0.1.1'
 const store = useMatchStore()
 
 onBeforeUnmount(() => {

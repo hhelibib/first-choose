@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { TICK_MS } from '@battle/shared'
-import { locale, localeModel, t, translateReason } from '../i18n/index'
+import { locale, localeModel, t } from '../i18n/index'
 import { useMatchStore } from '../store/match'
 
 const store = useMatchStore()
@@ -94,6 +94,7 @@ function leave(): void {
     </div>
     <div class="hud-clock">
       <span class="round">{{ t('hud.round', { n: store.snapshot.round }) }}</span>
+      <span class="tick">{{ t('hud.tick', { n: store.snapshot.tick }) }}</span>
       <span class="count">{{ countdown }}</span>
       <span class="phase">{{ phaseText }}</span>
     </div>
@@ -130,6 +131,7 @@ function leave(): void {
             <option value="en">{{ t('lang.en') }}</option>
           </select>
         </label>
+        <h3>{{ t('hud.display') }}</h3>
         <label class="check">
           <input
             type="checkbox"
@@ -139,13 +141,49 @@ function leave(): void {
           {{ t('hud.orderHints') }}
         </label>
         <p class="hint muted">{{ t('hud.orderHintsHint') }}</p>
+        <label class="check">
+          <input
+            type="checkbox"
+            :checked="store.showTips"
+            @change="store.setShowTips(($event.target as HTMLInputElement).checked)"
+          />
+          {{ t('hud.showTips') }}
+        </label>
+        <p class="hint muted">{{ t('hud.showTipsHint') }}</p>
+        <label class="check">
+          <input
+            type="checkbox"
+            :checked="store.showRejectTips"
+            @change="store.setShowRejectTips(($event.target as HTMLInputElement).checked)"
+          />
+          {{ t('hud.showRejectTips') }}
+        </label>
+        <p class="hint muted">{{ t('hud.showRejectTipsHint') }}</p>
+        <label class="check">
+          <input
+            type="checkbox"
+            :checked="store.showOrdersDock"
+            @change="store.setShowOrdersDock(($event.target as HTMLInputElement).checked)"
+          />
+          {{ t('hud.showOrdersDock') }}
+        </label>
+        <p class="hint muted">{{ t('hud.showOrdersDockHint') }}</p>
+        <label class="check">
+          <input
+            type="checkbox"
+            :checked="store.showReportDock"
+            @change="store.setShowReportDock(($event.target as HTMLInputElement).checked)"
+          />
+          {{ t('hud.showReportDock') }}
+        </label>
+        <p class="hint muted">{{ t('hud.showReportDockHint') }}</p>
+        <button type="button" class="ghost" @click="store.resetMutedTips()">{{ t('hud.resetTips') }}</button>
         <button type="button" @click="resetView">{{ t('hud.resetView') }}</button>
         <button type="button" @click="leave">{{ t('hud.lobby') }}</button>
         <button type="button" class="primary" @click="resume">{{ t('hud.resumeGame') }}</button>
         <button type="button" class="ghost" @click="closeSettings">{{ t('hud.close') }}</button>
       </div>
     </div>
-    <p v-if="store.lastReason" class="reason">{{ translateReason(store.lastReason) }}</p>
   </header>
 </template>
 
@@ -164,8 +202,7 @@ function leave(): void {
 
 .hud-resources,
 .hud-clock,
-.hud-right,
-.reason {
+.hud-right {
   pointer-events: auto;
 }
 
@@ -202,14 +239,20 @@ function leave(): void {
 }
 
 .hud-clock .round,
+.hud-clock .tick,
 .hud-clock .phase {
-  min-width: 88px;
+  min-width: 72px;
   font-size: 15px;
   color: #c5d0db;
 }
 
 .hud-clock .round {
   text-align: right;
+}
+
+.hud-clock .tick {
+  text-align: right;
+  color: #9ad1ff;
 }
 
 .hud-clock .phase {
@@ -275,7 +318,7 @@ function leave(): void {
 }
 
 .game-settings-dialog {
-  width: min(320px, 86vw);
+  width: min(360px, 86vw);
   display: grid;
   gap: 8px;
   padding: 20px;
@@ -289,6 +332,12 @@ function leave(): void {
   margin: 0;
   font-size: 18px;
   color: #e8edf2;
+}
+
+.game-settings-dialog h3 {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #9ad1ff;
 }
 
 .game-settings-dialog .hint {
@@ -340,17 +389,5 @@ function leave(): void {
 .game-settings-dialog .ghost {
   background: transparent;
   border-color: #3d4b5c;
-}
-
-.reason {
-  position: absolute;
-  top: 86px;
-  left: 50%;
-  transform: translateX(-50%);
-  margin: 0;
-  color: #ffb4b4;
-  background: rgb(15 22 30 / 70%);
-  padding: 4px 10px;
-  border-radius: 8px;
 }
 </style>
